@@ -480,6 +480,43 @@ export default function SalesPage() {
               ))}
             </div>
           </div>
+          {(() => {
+            const subtotal = lines.reduce(
+              (sum, l) => sum + (Number(l.quantity) || 0) * (Number(l.unitPrice) || 0),
+              0
+            );
+            const gstPct = Number(gstPerc) || 0;
+            const gstAmount = subtotal * (gstPct / 100);
+            const totalInclGst = subtotal + gstAmount;
+            return (
+              <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
+                <div className="flex flex-col gap-1 text-sm">
+                  <div className="flex justify-between text-slate-600">
+                    <span>Subtotal</span>
+                    <span>₹{subtotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+                  </div>
+                  {gstPct > 0 && (
+                    <>
+                      <div className="flex justify-between text-slate-600">
+                        <span>GST ({gstPct}%)</span>
+                        <span>₹{gstAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+                      </div>
+                      <div className="flex justify-between font-medium text-slate-900 border-t border-slate-200 pt-2 mt-1">
+                        <span>Total (incl. GST)</span>
+                        <span>₹{totalInclGst.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+                      </div>
+                    </>
+                  )}
+                  {gstPct === 0 && (
+                    <div className="flex justify-between font-medium text-slate-900 border-t border-slate-200 pt-2 mt-1">
+                      <span>Total</span>
+                      <span>₹{subtotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
           <div className="mt-4">
             <button
               type="submit"
@@ -505,7 +542,7 @@ export default function SalesPage() {
                 Reference
               </th>
               <th className="px-4 py-3 text-right text-xs font-medium text-slate-500">
-                Total
+                Total (incl. GST)
               </th>
               <th className="px-4 py-3 text-right text-xs font-medium text-slate-500">
                 Actions
