@@ -40,7 +40,7 @@ export default function DashboardPage() {
     );
   }
 
-  if (!data || data.error) {
+  if (!data) {
     return (
       <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-6">
         <p className="font-medium text-amber-900">Failed to load dashboard</p>
