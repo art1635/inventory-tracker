@@ -22,7 +22,8 @@ export default function CustomersPage() {
   const load = () =>
     fetch("/api/customers")
       .then((r) => r.json())
-      .then(setCustomers);
+      .then((json) => setCustomers(Array.isArray(json) ? json : []))
+      .catch(() => setCustomers([]));
 
   useEffect(() => {
     load().finally(() => setLoading(false));
@@ -162,7 +163,7 @@ export default function CustomersPage() {
                 </td>
               </tr>
             ) : (
-              customers.map((c) => (
+              (Array.isArray(customers) ? customers : []).map((c) => (
                 <tr key={c.id} className="hover:bg-slate-50/50">
                   <td className="px-4 py-3 text-sm font-medium text-slate-900">
                     {c.name}

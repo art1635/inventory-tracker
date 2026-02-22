@@ -60,8 +60,8 @@ export default function PurchasesPage() {
   ]);
 
   const load = () => {
-    fetch("/api/purchases").then((r) => r.json()).then(setPurchases);
-    fetch("/api/suppliers").then((r) => r.json()).then(setSuppliers);
+    fetch("/api/purchases").then((r) => r.json()).then((json) => setPurchases(Array.isArray(json) ? json : [])).catch(() => setPurchases([]));
+    fetch("/api/suppliers").then((r) => r.json()).then((json) => setSuppliers(Array.isArray(json) ? json : [])).catch(() => setSuppliers([]));
   };
 
   useEffect(() => {
@@ -71,9 +71,14 @@ export default function PurchasesPage() {
       fetch("/api/products").then((r) => r.json()),
     ])
       .then(([p, s, prod]) => {
-        setPurchases(p);
-        setSuppliers(s);
-        setProducts(prod);
+        setPurchases(Array.isArray(p) ? p : []);
+        setSuppliers(Array.isArray(s) ? s : []);
+        setProducts(Array.isArray(prod) ? prod : []);
+      })
+      .catch(() => {
+        setPurchases([]);
+        setSuppliers([]);
+        setProducts([]);
       })
       .finally(() => setLoading(false));
   }, []);
@@ -265,7 +270,7 @@ export default function PurchasesPage() {
               >
                 <option value="">Select supplier</option>
                 <option value="__new__">+ Add new supplier</option>
-                {suppliers.map((s) => (
+                {(Array.isArray(suppliers) ? suppliers : []).map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.name}
                   </option>
@@ -372,7 +377,7 @@ export default function PurchasesPage() {
                         className="mt-0.5 w-full rounded border border-slate-300 px-2 py-1.5 text-sm"
                       >
                         <option value="">Select product</option>
-                        {products.map((p) => (
+                        {(Array.isArray(products) ? products : []).map((p) => (
                           <option key={p.id} value={p.id}>
                             {p.name}
                           </option>
@@ -514,7 +519,7 @@ export default function PurchasesPage() {
                 </td>
               </tr>
             ) : (
-              purchases.map((p) => (
+              (Array.isArray(purchases) ? purchases : []).map((p) => (
                 <tr key={p.id} className="hover:bg-slate-50/50">
                   <td className="px-4 py-3 text-sm text-slate-900">
                     {new Date(p.date).toLocaleDateString()}

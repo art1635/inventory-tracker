@@ -31,7 +31,8 @@ export default function ProductsPage() {
   const load = () =>
     fetch("/api/products")
       .then((r) => r.json())
-      .then(setProducts);
+      .then((json) => setProducts(Array.isArray(json) ? json : []))
+      .catch(() => setProducts([]));
 
   useEffect(() => {
     load().finally(() => setLoading(false));
@@ -290,7 +291,7 @@ export default function ProductsPage() {
                 </td>
               </tr>
             ) : (
-              products.map((p) => (
+              (Array.isArray(products) ? products : []).map((p) => (
                 <tr key={p.id} className="hover:bg-slate-50/50">
                   <td className="px-4 py-3 text-sm font-medium text-slate-900">
                     {p.name}

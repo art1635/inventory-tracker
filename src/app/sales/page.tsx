@@ -64,8 +64,8 @@ export default function SalesPage() {
   }, []);
 
   const load = () => {
-    fetch("/api/sales").then((r) => r.json()).then(setSales);
-    fetch("/api/customers").then((r) => r.json()).then(setCustomers);
+    fetch("/api/sales").then((r) => r.json()).then((json) => setSales(Array.isArray(json) ? json : [])).catch(() => setSales([]));
+    fetch("/api/customers").then((r) => r.json()).then((json) => setCustomers(Array.isArray(json) ? json : [])).catch(() => setCustomers([]));
   };
 
   useEffect(() => {
@@ -75,9 +75,14 @@ export default function SalesPage() {
       fetch("/api/products").then((r) => r.json()),
     ])
       .then(([s, c, prod]) => {
-        setSales(s);
-        setCustomers(c);
-        setProducts(prod);
+        setSales(Array.isArray(s) ? s : []);
+        setCustomers(Array.isArray(c) ? c : []);
+        setProducts(Array.isArray(prod) ? prod : []);
+      })
+      .catch(() => {
+        setSales([]);
+        setCustomers([]);
+        setProducts([]);
       })
       .finally(() => setLoading(false));
   }, []);
@@ -248,7 +253,7 @@ export default function SalesPage() {
               >
                 <option value="">Select customer</option>
                 <option value="__new__">+ Add new customer</option>
-                {customers.map((c) => (
+                {(Array.isArray(customers) ? customers : []).map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
                   </option>
@@ -355,7 +360,7 @@ export default function SalesPage() {
                         className="mt-0.5 w-full rounded border border-slate-300 px-2 py-1.5 text-sm"
                       >
                         <option value="">Select product</option>
-                        {products.map((p) => (
+                        {(Array.isArray(products) ? products : []).map((p) => (
                           <option key={p.id} value={p.id}>
                             {p.name}
                           </option>
@@ -493,7 +498,7 @@ export default function SalesPage() {
                 </td>
               </tr>
             ) : (
-              sales.map((s) => (
+              (Array.isArray(sales) ? sales : []).map((s) => (
                 <tr key={s.id} className="hover:bg-slate-50/50">
                   <td className="px-4 py-3 text-sm text-slate-900">
                     {new Date(s.date).toLocaleDateString()}

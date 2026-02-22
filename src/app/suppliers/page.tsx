@@ -22,7 +22,8 @@ export default function SuppliersPage() {
   const load = () =>
     fetch("/api/suppliers")
       .then((r) => r.json())
-      .then(setSuppliers);
+      .then((json) => setSuppliers(Array.isArray(json) ? json : []))
+      .catch(() => setSuppliers([]));
 
   useEffect(() => {
     load().finally(() => setLoading(false));
@@ -162,7 +163,7 @@ export default function SuppliersPage() {
                 </td>
               </tr>
             ) : (
-              suppliers.map((s) => (
+              (Array.isArray(suppliers) ? suppliers : []).map((s) => (
                 <tr key={s.id} className="hover:bg-slate-50/50">
                   <td className="px-4 py-3 text-sm font-medium text-slate-900">
                     {s.name}

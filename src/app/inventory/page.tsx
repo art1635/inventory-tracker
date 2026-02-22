@@ -23,18 +23,21 @@ export default function InventoryPage() {
   useEffect(() => {
     fetch("/api/inventory")
       .then((r) => r.json())
-      .then(setInventory)
+      .then((json) => setInventory(Array.isArray(json) ? json : []))
+      .catch(() => setInventory([]))
       .finally(() => setLoading(false));
   }, []);
 
-  const filteredInventory = productFilter.trim()
-    ? inventory.filter((item) => {
+  const filteredInventory = Array.isArray(inventory)
+    ? productFilter.trim()
+      ? inventory.filter((item) => {
         const q = productFilter.trim().toLowerCase();
         const name = item.product.name.toLowerCase();
         const sku = (item.product.sku ?? "").toLowerCase();
         return name.includes(q) || sku.includes(q);
       })
-    : inventory;
+      : inventory
+    : [];
 
   if (loading) {
     return (
@@ -108,7 +111,7 @@ export default function InventoryPage() {
                 </td>
               </tr>
             ) : (
-              filteredInventory.map((item) => (
+              (Array.isArray(filteredInventory) ? filteredInventory : []).map((item) => (
                 <tr key={item.id} className="hover:bg-slate-50/50">
                   <td className="px-4 py-3 text-sm font-medium text-slate-900">
                     {item.product.name}
