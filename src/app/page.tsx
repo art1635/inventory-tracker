@@ -78,13 +78,14 @@ export default function DashboardPage() {
     { label: "Purchases", value: data.purchases, href: "/purchases" },
     { label: "Sales", value: data.sales, href: "/sales" },
   ];
+  const lowStockList = Array.isArray(data.lowStock) ? data.lowStock : [];
 
   return (
     <div className="space-y-8">
       <h1 className="text-2xl font-semibold text-slate-900">Dashboard</h1>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        {cards.map((c) => (
+        {Array.isArray(cards) && cards.map((c) => (
           <Link
             key={c.href}
             href={c.href}
@@ -117,13 +118,13 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {(data.lowStock?.length ?? 0) > 0 && (
+      {lowStockList.length > 0 && (
         <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-5">
           <h2 className="text-sm font-medium text-amber-800">
             Low stock (≤10 units)
           </h2>
           <ul className="mt-3 space-y-1">
-            {(data.lowStock ?? []).map((item) => (
+            {lowStockList.map((item) => (
               <li key={item?.product?.id ?? item?.product?.name ?? Math.random()} className="flex justify-between text-sm">
                 <Link
                   href="/inventory"
