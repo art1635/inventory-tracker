@@ -44,6 +44,7 @@ export default function DashboardPage() {
     return (
       <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-6">
         <p className="font-medium text-amber-900">Failed to load dashboard</p>
+        {/* Shown when API returns error or invalid response */}
         <p className="mt-1 text-sm text-amber-800">
           The server or database may be starting. Try refreshing in a moment.
         </p>
