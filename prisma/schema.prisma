@@ -1,12 +1,12 @@
 // SMB Inventory & Sales Tracker
-// SQLite for easy local deployment
+// PostgreSQL for production (e.g. Neon); use Neon for local dev too
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
 }
 
 model Product {

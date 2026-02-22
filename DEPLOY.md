@@ -1,51 +1,66 @@
 # Deploy so others can test (e.g. reviewer in another city)
 
-Your app uses **SQLite**. The easiest way to get a **stable, always-on link** is to deploy to **Railway** (free tier, keeps SQLite and runs 24/7).
+The app uses **PostgreSQL** (Neon) so it works on Railway without volumes.
 
 ---
 
-## 1. Push your code to GitHub
+## 1. Create a free database on Neon
 
-If you haven’t already:
-
-```bash
-git init
-git add .
-git commit -m "Initial commit"
-```
-
-Create a new repo on [github.com](https://github.com/new), then:
-
-```bash
-git remote add origin https://github.com/YOUR_USERNAME/YOUR_REPO_NAME.git
-git branch -M main
-git push -u origin main
-```
+1. Go to [neon.tech](https://neon.tech) and sign up (free).
+2. **New project** → name it (e.g. `inventory-tracker`) → **Create project**.
+3. On the project dashboard, copy the **connection string**. It looks like:
+   ```
+   postgresql://user:password@ep-xxx.region.aws.neon.tech/neondb?sslmode=require
+   ```
+   (Use the one that includes the password.)
 
 ---
 
-## 2. Deploy on Railway
+## 2. Run migrations against Neon (one-time)
+
+On your machine (with the repo cloned):
+
+```bash
+# Set the Neon connection string (paste your real URL)
+set DATABASE_URL=postgresql://user:password@ep-xxx.region.aws.neon.tech/neondb?sslmode=require
+
+npx prisma migrate deploy
+```
+
+This creates all tables in your Neon database.
+
+---
+
+## 3. Deploy on Railway
 
 1. Go to [railway.app](https://railway.app) and sign in (e.g. with GitHub).
 2. **New Project** → **Deploy from GitHub repo** → choose this repo.
-3. After the first deploy attempt, open the service → **Variables** and add:
-   - `DATABASE_URL` = `file:/data/prod.db`
-4. Open **Settings** → **Volumes** → **Add volume**, mount path: `/data`.
-5. **Settings** → **Deploy**:
+3. Open the service → **Variables** → **Add variable**:
+   - **Name:** `DATABASE_URL`
+   - **Value:** paste the **same Neon connection string** from step 1
+4. **Settings**:
    - **Build command:** `npm run build`
    - **Start command:** `npm run start:prod`
-6. Redeploy (e.g. **Deploy** → **Redeploy**).
+5. Redeploy (e.g. **Deployments** → **Redeploy**).
 
-Railway will give you a URL like `https://your-app.up.railway.app`. Share that link; it will work whenever the app is running (free tier may sleep after inactivity; the next visit wakes it).
-
----
-
-## 3. (Optional) Custom domain
-
-In Railway: **Settings** → **Networking** → **Custom domain** and add a domain you own (e.g. `inventory.yourdomain.com`). Point the domain’s DNS to the value Railway shows.
+Railway will give you a URL like `https://your-app.up.railway.app`. Share that link; the app will load data from Neon.
 
 ---
 
-## If you prefer Vercel
+## 4. Local development
 
-Vercel doesn’t support SQLite for persistent data. You’d need to use a hosted database (e.g. [Neon](https://neon.tech) Postgres) and change the app to use Postgres in production. That’s more setup; for “someone tests on a regular basis,” Railway + SQLite above is the fastest path.
+Use the same Neon database (easiest), or a local Postgres:
+
+- **Option A:** In the project root, create `.env` with:
+  ```
+  DATABASE_URL=postgresql://...your Neon connection string...
+  ```
+  Then `npm run dev` will use Neon.
+
+- **Option B:** Install Postgres locally and set `DATABASE_URL` to your local DB.
+
+---
+
+## 5. (Optional) Custom domain
+
+In Railway: **Settings** → **Networking** → **Custom domain** and add your domain. Point DNS to the value Railway shows.
