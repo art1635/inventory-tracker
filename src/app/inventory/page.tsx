@@ -51,8 +51,7 @@ export default function InventoryPage() {
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold text-slate-900">Inventory</h1>
       <p className="text-sm text-slate-600">
-        Current stock. &quot;Litres/unit&quot; is from Product Master (e.g. 208 L per drum).
-        &quot;Total litres&quot; is litres in stock and updates on purchase/sale.
+        Current stock. Total litres updates on purchase/sale.
       </p>
 
       <div className="flex flex-wrap items-center gap-3">
@@ -88,13 +87,7 @@ export default function InventoryPage() {
                 Quantity
               </th>
               <th className="px-4 py-3 text-right text-xs font-medium text-slate-500">
-                Litres/unit
-              </th>
-              <th className="px-4 py-3 text-right text-xs font-medium text-slate-500">
                 Total litres
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-slate-500">
-                Unit
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-slate-500">
                 Status
@@ -104,7 +97,7 @@ export default function InventoryPage() {
           <tbody className="divide-y divide-slate-200">
             {filteredInventory.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-slate-500">
+                <td colSpan={5} className="px-4 py-8 text-center text-slate-500">
                   {inventory.length === 0
                     ? "No inventory yet. Add products and record purchases."
                     : "No products match your search. Try a different name or SKU."}
@@ -122,16 +115,8 @@ export default function InventoryPage() {
                   <td className="px-4 py-3 text-right text-sm font-semibold text-slate-900">
                     {item.quantity}
                   </td>
-                  <td className="px-4 py-3 text-right text-sm text-slate-900">
-                    {item.product.litres != null
-                      ? `${item.product.litres} L`
-                      : "—"}
-                  </td>
                   <td className="px-4 py-3 text-right text-sm font-semibold text-slate-900">
                     {item.litres.toFixed(2)} L
-                  </td>
-                  <td className="px-4 py-3 text-sm text-slate-600">
-                    {item.product.unit}
                   </td>
                   <td className="px-4 py-3">
                     {item.quantity <= 10 ? (
