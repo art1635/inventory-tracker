@@ -20,12 +20,9 @@ export default function DashboardPage() {
 
   useEffect(() => {
     fetch("/api/dashboard")
-      .then((r) => {
-        if (!r.ok) return null;
-        return r.json();
-      })
-      .then((json) => {
-        if (!json || json.error || typeof json.products !== "number") {
+      .then((r) => r.json().then((json) => ({ ok: r.ok, json })))
+      .then(({ ok, json }) => {
+        if (!ok || !json || json.error) {
           setData(null);
           return;
         }
