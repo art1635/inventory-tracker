@@ -20,13 +20,25 @@ export default function DashboardPage() {
 
   useEffect(() => {
     fetch("/api/dashboard")
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) return null;
+        return r.json();
+      })
       .then((json) => {
-        if (json?.error || typeof json?.products !== "number") {
+        if (!json || json.error || typeof json.products !== "number") {
           setData(null);
           return;
         }
-        setData(json);
+        setData({
+          products: Number(json.products) ?? 0,
+          suppliers: Number(json.suppliers) ?? 0,
+          customers: Number(json.customers) ?? 0,
+          purchases: Number(json.purchases) ?? 0,
+          sales: Number(json.sales) ?? 0,
+          purchaseTotal: Number(json.purchaseTotal) ?? 0,
+          saleTotal: Number(json.saleTotal) ?? 0,
+          lowStock: Array.isArray(json.lowStock) ? json.lowStock : [],
+        });
       })
       .catch(() => setData(null))
       .finally(() => setLoading(false));
@@ -92,7 +104,7 @@ export default function DashboardPage() {
             Total purchased (from suppliers)
           </h2>
           <p className="mt-1 text-2xl font-semibold text-slate-900">
-            ₹{data.purchaseTotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+            ₹{(data.purchaseTotal ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
           </p>
         </div>
         <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -100,26 +112,26 @@ export default function DashboardPage() {
             Total sales (to customers)
           </h2>
           <p className="mt-1 text-2xl font-semibold text-slate-900">
-            ₹{data.saleTotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+            ₹{(data.saleTotal ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
           </p>
         </div>
       </div>
 
-      {data.lowStock.length > 0 && (
+      {(data.lowStock?.length ?? 0) > 0 && (
         <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-5">
           <h2 className="text-sm font-medium text-amber-800">
             Low stock (≤10 units)
           </h2>
           <ul className="mt-3 space-y-1">
-            {data.lowStock.map((item) => (
-              <li key={item.product.id} className="flex justify-between text-sm">
+            {(data.lowStock ?? []).map((item) => (
+              <li key={item?.product?.id ?? item?.product?.name ?? Math.random()} className="flex justify-between text-sm">
                 <Link
                   href="/inventory"
                   className="font-medium text-amber-900 hover:underline"
                 >
-                  {item.product.name}
+                  {item?.product?.name ?? "—"}
                 </Link>
-                <span className="text-amber-700">{item.quantity} left</span>
+                <span className="text-amber-700">{item?.quantity ?? 0} left</span>
               </li>
             ))}
           </ul>

@@ -15,6 +15,11 @@ export default function Error({
           A client-side error occurred. This can happen if the server is still starting or the
           database is not ready. Try refreshing.
         </p>
+        {error?.message && (
+          <p className="mt-2 rounded bg-slate-100 px-2 py-1.5 font-mono text-xs text-slate-700 break-all">
+            {error.message}
+          </p>
+        )}
         <button
           type="button"
           onClick={() => reset()}
