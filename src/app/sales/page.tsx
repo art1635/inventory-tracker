@@ -312,7 +312,7 @@ export default function SalesPage() {
               </div>
             )}
             <div>
-              <label className="block text-sm text-slate-600">Date</label>
+              <label className="block text-sm text-slate-600">Date of sale</label>
               <input
                 type="date"
                 value={date}
@@ -321,7 +321,7 @@ export default function SalesPage() {
               />
             </div>
             <div>
-              <label className="block text-sm text-slate-600">Reference (Invoice #)</label>
+              <label className="block text-sm text-slate-600">Invoice number</label>
               <input
                 value={reference}
                 onChange={(e) => setReference(e.target.value)}
@@ -533,13 +533,13 @@ export default function SalesPage() {
           <thead className="bg-slate-50">
             <tr>
               <th className="px-4 py-3 text-left text-xs font-medium text-slate-500">
-                Date
+                Date of sale
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-slate-500">
                 Customer
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-slate-500">
-                Reference
+                Invoice number
               </th>
               <th className="px-4 py-3 text-right text-xs font-medium text-slate-500">
                 Total (incl. GST)

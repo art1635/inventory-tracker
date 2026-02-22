@@ -27,8 +27,32 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
+    if (!sku?.trim()) {
+      return NextResponse.json(
+        { error: "SKU is required" },
+        { status: 400 }
+      );
+    }
+    if (!unit?.trim()) {
+      return NextResponse.json(
+        { error: "Unit is required" },
+        { status: 400 }
+      );
+    }
+    if (!stockType?.trim()) {
+      return NextResponse.json(
+        { error: "Stock type is required" },
+        { status: 400 }
+      );
+    }
     const litresNum =
       litres != null && litres !== "" ? Number(litres) : null;
+    if (litresNum == null || Number.isNaN(litresNum) || litresNum < 0) {
+      return NextResponse.json(
+        { error: "Litres is required (0 or more)" },
+        { status: 400 }
+      );
+    }
     const defaultRateNum =
       defaultRatePerLitre != null && defaultRatePerLitre !== "" ? Number(defaultRatePerLitre) : null;
     const gstPercNum =
@@ -36,12 +60,11 @@ export async function POST(request: Request) {
     const product = await prisma.product.create({
       data: {
         name: name.trim(),
-        sku: sku?.trim() || null,
+        sku: sku.trim(),
         description: description?.trim() || null,
-        unit: unit?.trim() || "pcs",
-        stockType: stockType?.trim() || null,
-        litres:
-          litresNum != null && !Number.isNaN(litresNum) ? litresNum : null,
+        unit: unit.trim(),
+        stockType: stockType.trim(),
+        litres: litresNum,
         defaultRatePerLitre:
           defaultRateNum != null && !Number.isNaN(defaultRateNum) ? defaultRateNum : null,
         gstPerc:

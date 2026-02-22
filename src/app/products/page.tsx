@@ -27,6 +27,9 @@ export default function ProductsPage() {
   const [litres, setLitres] = useState("");
   const [defaultRatePerLitre, setDefaultRatePerLitre] = useState("");
   const [gstPerc, setGstPerc] = useState("");
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<{ created: number; createdNames: string[]; errors?: { row: number; message: string }[] } | null>(null);
 
   const load = () =>
     fetch("/api/products")
@@ -66,13 +69,39 @@ export default function ProductsPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const nameVal = name.trim();
+    const skuVal = sku.trim();
+    const unitVal = unit.trim();
+    const stockVal = stockType.trim();
+    const litresVal = litres.trim();
+    if (!nameVal) {
+      alert("Name is required.");
+      return;
+    }
+    if (!skuVal) {
+      alert("SKU is required.");
+      return;
+    }
+    if (!unitVal) {
+      alert("Unit is required.");
+      return;
+    }
+    if (!stockVal) {
+      alert("Stock type is required.");
+      return;
+    }
+    const litresNum = litresVal ? parseFloat(litresVal) : NaN;
+    if (litresVal === "" || !Number.isFinite(litresNum) || litresNum < 0) {
+      alert("Litres is required (0 or more).");
+      return;
+    }
     const payload = {
-      name: name.trim(),
-      sku: sku.trim() || null,
+      name: nameVal,
+      sku: skuVal,
       description: description.trim() || null,
-      unit: unit.trim() || "",
-      stockType: stockType.trim() || null,
-      litres: litres.trim() ? parseFloat(litres) || null : null,
+      unit: unitVal,
+      stockType: stockVal,
+      litres: litresNum,
       defaultRatePerLitre: defaultRatePerLitre.trim() ? parseFloat(defaultRatePerLitre) || null : null,
       gstPerc: gstPerc.trim() ? parseFloat(gstPerc) || null : null,
     };
@@ -111,6 +140,40 @@ export default function ProductsPage() {
     else alert("Failed to delete");
   };
 
+  const handleImport = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!importFile) {
+      alert("Choose an Excel file first.");
+      return;
+    }
+    setImporting(true);
+    setImportResult(null);
+    try {
+      const formData = new FormData();
+      formData.set("file", importFile);
+      const res = await fetch("/api/products/import", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || "Import failed");
+        setImporting(false);
+        return;
+      }
+      setImportResult(data);
+      setImportFile(null);
+      if (document.getElementById("import-file-input")) {
+        (document.getElementById("import-file-input") as HTMLInputElement).value = "";
+      }
+      load();
+    } catch {
+      alert("Import failed");
+    } finally {
+      setImporting(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -123,28 +186,84 @@ export default function ProductsPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h1 className="text-2xl font-semibold text-slate-900">Product Master</h1>
-        <button
-          type="button"
-          onClick={() => {
-            if (showForm) cancelForm();
-            else {
-              setEditingId(null);
-              setName("");
-              setSku("");
-              setDescription("");
-              setUnit("");
-              setStockType("");
-              setLitres("");
-              setDefaultRatePerLitre("");
-              setGstPerc("");
-              setShowForm(true);
-            }
-          }}
-          className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700"
-        >
-          {showForm ? "Cancel" : "Add product"}
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <form
+            onSubmit={handleImport}
+            className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2"
+          >
+            <label className="inline-flex cursor-pointer items-center gap-2 text-sm">
+              <span className="text-slate-600">Import:</span>
+              <span className="rounded border-2 border-dashed border-teal-500 bg-teal-50 px-3 py-1.5 font-medium text-teal-700 hover:border-teal-600 hover:bg-teal-100">
+                Choose Excel file
+              </span>
+              <input
+                id="import-file-input"
+                type="file"
+                accept=".xlsx,.xls,.csv"
+                onChange={(e) => setImportFile(e.target.files?.[0] ?? null)}
+                className="sr-only"
+              />
+            </label>
+            {importFile && (
+              <span className="text-sm text-slate-600">
+                {importFile.name}
+              </span>
+            )}
+            <button
+              type="submit"
+              disabled={importing}
+              className="rounded bg-slate-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+            >
+              {importing ? "Importing…" : "Upload"}
+            </button>
+          </form>
+          <span className="text-xs text-slate-500">
+            First row = headers. Required: <strong>Name</strong>, <strong>SKU</strong>, <strong>Unit</strong>, <strong>Stock type</strong>, <strong>Litres</strong>. Optional: Description, Default rate per litre, GST %
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              if (showForm) cancelForm();
+              else {
+                setEditingId(null);
+                setName("");
+                setSku("");
+                setDescription("");
+                setUnit("");
+                setStockType("");
+                setLitres("");
+                setDefaultRatePerLitre("");
+                setGstPerc("");
+                setShowForm(true);
+              }
+            }}
+            className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700"
+          >
+            {showForm ? "Cancel" : "Add product"}
+          </button>
+        </div>
       </div>
+
+      {importResult != null && (
+        <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm">
+          <p className="font-medium text-slate-800">
+            Imported {importResult.created} product(s).
+            {importResult.createdNames.length > 0 && (
+              <span className="ml-1 font-normal text-slate-600">
+                ({importResult.createdNames.slice(0, 10).join(", ")}
+                {importResult.createdNames.length > 10 ? ` +${importResult.createdNames.length - 10} more` : ""})
+              </span>
+            )}
+          </p>
+          {importResult.errors && importResult.errors.length > 0 && (
+            <p className="mt-2 text-amber-700">
+              {importResult.errors.length} row(s) had errors:{" "}
+              {importResult.errors.slice(0, 3).map((e) => e.message).join("; ")}
+              {importResult.errors.length > 3 ? ` (+${importResult.errors.length - 3} more)` : ""}
+            </p>
+          )}
+        </div>
+      )}
 
       {showForm && (
         <form
@@ -165,11 +284,12 @@ export default function ProductsPage() {
               />
             </div>
             <div>
-              <label className="block text-sm text-slate-600">SKU</label>
+              <label className="block text-sm text-slate-600">SKU *</label>
               <input
                 value={sku}
                 onChange={(e) => setSku(e.target.value)}
                 className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                required
               />
             </div>
             <div className="sm:col-span-2">
@@ -181,23 +301,23 @@ export default function ProductsPage() {
               />
             </div>
             <div>
-              <label className="block text-sm text-slate-600">Units</label>
+              <label className="block text-sm text-slate-600">Unit *</label>
               <input
-                type="number"
-                min="0"
-                step="1"
+                type="text"
                 value={unit}
                 onChange={(e) => setUnit(e.target.value)}
                 className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                placeholder="e.g. 1, 250"
+                placeholder="e.g. pcs, 1, 250"
+                required
               />
             </div>
             <div>
-              <label className="block text-sm text-slate-600">Stock type</label>
+              <label className="block text-sm text-slate-600">Stock type *</label>
               <select
                 value={stockType}
                 onChange={(e) => setStockType(e.target.value)}
                 className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                required
               >
                 <option value="">Select stock type</option>
                 <option value="Drum">Drum</option>
@@ -205,7 +325,7 @@ export default function ProductsPage() {
               </select>
             </div>
             <div>
-              <label className="block text-sm text-slate-600">Litres</label>
+              <label className="block text-sm text-slate-600">Litres *</label>
               <input
                 type="number"
                 min="0"
@@ -213,7 +333,8 @@ export default function ProductsPage() {
                 value={litres}
                 onChange={(e) => setLitres(e.target.value)}
                 className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                placeholder="Volume in litres"
+                placeholder="Volume in litres (0 or more)"
+                required
               />
             </div>
             <div>

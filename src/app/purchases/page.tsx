@@ -460,26 +460,6 @@ export default function PurchasesPage() {
                       </button>
                     </div>
                   </div>
-                  <div className="mt-2 flex items-center gap-2">
-                    <label className="text-xs text-slate-600">
-                      Price per unit (only if not using rate per litre):
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={line.unitPrice || ""}
-                      onChange={(e) =>
-                        updateLine(
-                          i,
-                          "unitPrice",
-                          parseFloat(e.target.value) || 0
-                        )
-                      }
-                      className="w-24 rounded border border-slate-300 px-2 py-1 text-sm"
-                      placeholder="0.00"
-                    />
-                  </div>
                 </div>
               ))}
             </div>
