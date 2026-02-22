@@ -21,7 +21,14 @@ export default function DashboardPage() {
   useEffect(() => {
     fetch("/api/dashboard")
       .then((r) => r.json())
-      .then(setData)
+      .then((json) => {
+        if (json?.error || typeof json?.products !== "number") {
+          setData(null);
+          return;
+        }
+        setData(json);
+      })
+      .catch(() => setData(null))
       .finally(() => setLoading(false));
   }, []);
 
@@ -33,9 +40,21 @@ export default function DashboardPage() {
     );
   }
 
-  if (!data) {
+  if (!data || data.error) {
     return (
-      <p className="text-slate-600">Failed to load dashboard. Try refreshing.</p>
+      <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-6">
+        <p className="font-medium text-amber-900">Failed to load dashboard</p>
+        <p className="mt-1 text-sm text-amber-800">
+          The server or database may be starting. Try refreshing in a moment.
+        </p>
+        <button
+          type="button"
+          onClick={() => window.location.reload()}
+          className="mt-3 rounded-lg bg-amber-200 px-3 py-1.5 text-sm font-medium text-amber-900 hover:bg-amber-300"
+        >
+          Retry
+        </button>
+      </div>
     );
   }
 
