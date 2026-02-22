@@ -1,0 +1,120 @@
+// SMB Inventory & Sales Tracker
+// SQLite for easy local deployment
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Product {
+  id                  String   @id @default(cuid())
+  name                String
+  sku                 String?  @unique
+  description         String?
+  unit                String   @default("pcs")
+  stockType           String?
+  litres              Float?
+  defaultRatePerLitre Float?   // default purchase price per litre (used to auto-calc purchase total)
+  gstPerc             Float?   // GST %
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  inventory     Inventory?
+  purchaseItems PurchaseItem[]
+  saleItems     SaleItem[]
+}
+
+model Supplier {
+  id        String   @id @default(cuid())
+  name      String
+  email     String?
+  phone     String?
+  address   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  purchases Purchase[]
+}
+
+model Purchase {
+  id         String   @id @default(cuid())
+  supplierId String
+  date       DateTime @default(now())
+  reference  String?
+  total      Float    @default(0)
+  notes      String?
+  createdAt  DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  supplier Supplier     @relation(fields: [supplierId], references: [id])
+  items    PurchaseItem[]
+}
+
+model PurchaseItem {
+  id             String   @id @default(cuid())
+  purchaseId     String
+  productId      String
+  quantity       Int     // used for inventory (same as unitsReceived)
+  unitPrice      Float
+  total          Float
+  batchNumber    String?
+  ratePerLitre   Float?
+  unitsReceived  Int?
+  stockType      String? // Drum | Pail
+
+  purchase Purchase @relation(fields: [purchaseId], references: [id])
+  product  Product  @relation(fields: [productId], references: [id])
+}
+
+model Customer {
+  id        String   @id @default(cuid())
+  name      String
+  email     String?
+  phone     String?
+  address   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sales Sale[]
+}
+
+model Sale {
+  id         String   @id @default(cuid())
+  customerId String
+  date       DateTime @default(now())
+  reference  String?
+  total      Float    @default(0)
+  notes      String?
+  createdAt  DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  customer Customer  @relation(fields: [customerId], references: [id])
+  items    SaleItem[]
+}
+
+model SaleItem {
+  id          String  @id @default(cuid())
+  saleId      String
+  productId   String
+  quantity    Int     // total units dispatched
+  unitPrice   Float   // selling price
+  total       Float
+  batchNumber String?
+  stockType   String? // Drum | Pail
+
+  sale    Sale    @relation(fields: [saleId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
+}
+
+model Inventory {
+  id        String   @id @default(cuid())
+  productId String   @unique
+  quantity  Int      @default(0)
+  litres    Float    @default(0) // total litres in stock (deducted on sale)
+  updatedAt DateTime @updatedAt
+
+  product Product @relation(fields: [productId], references: [id])
+}
