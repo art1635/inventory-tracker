@@ -25,12 +25,20 @@ const NEW_CUSTOMER = "__new__";
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { customerId, newCustomer, reference, notes, date, items } = body;
+    const { customerId, newCustomer, reference, notes, date, gstPerc, items } = body;
     if (!Array.isArray(items) || items.length === 0) {
       return NextResponse.json(
         { error: "At least one item is required" },
         { status: 400 }
       );
+    }
+    for (const item of items) {
+      if (!item.batchNumber?.trim()) {
+        return NextResponse.json(
+          { error: "Batch is required for every line item" },
+          { status: 400 }
+        );
+      }
     }
 
     let resolvedCustomerId: string;
@@ -66,24 +74,26 @@ export async function POST(request: Request) {
       quantity: number;
       unitPrice: number;
       total: number;
-      batchNumber: string | null;
+      batchNumber: string;
       stockType: string | null;
     }[] = [];
-    let total = 0;
+    let subtotal = 0;
     for (const item of items) {
       const qty = Math.max(0, Number(item.quantity) || 0);
       const price = Number(item.unitPrice) || 0;
       const lineTotal = qty * price;
-      total += lineTotal;
+      subtotal += lineTotal;
       lineItems.push({
         productId: item.productId,
         quantity: qty,
         unitPrice: price,
         total: lineTotal,
-        batchNumber: item.batchNumber?.trim() || null,
+        batchNumber: item.batchNumber.trim(),
         stockType: item.stockType?.trim() || null,
       });
     }
+    const gst = Number(gstPerc) || 0;
+    const total = subtotal * (1 + gst / 100);
 
     const sale = await prisma.$transaction(async (tx) => {
       for (const line of lineItems) {
@@ -115,6 +125,7 @@ export async function POST(request: Request) {
           reference: reference?.trim() || null,
           notes: notes?.trim() || null,
           total,
+          gstPerc: gst > 0 ? gst : null,
           ...(date && { date: new Date(date) }),
         },
       });

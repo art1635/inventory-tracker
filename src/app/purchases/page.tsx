@@ -126,6 +126,11 @@ export default function PurchasesPage() {
       alert("Add at least one product with units received > 0");
       return;
     }
+    const missingBatch = items.some((l) => !l.batchNumber?.trim());
+    if (missingBatch) {
+      alert("Batch number is required for every line item.");
+      return;
+    }
     const body = {
       supplierId: supplierId === "__new__" ? undefined : supplierId,
       ...(supplierId === "__new__" && newSupplierName.trim() && {
@@ -141,7 +146,7 @@ export default function PurchasesPage() {
       date,
       items: items.map((l) => ({
         productId: l.productId,
-        batchNumber: l.batchNumber.trim() || undefined,
+        batchNumber: l.batchNumber.trim(),
         ratePerLitre: l.ratePerLitre.trim() ? parseFloat(l.ratePerLitre) : undefined,
         unitsReceived: Number(l.unitsReceived) || 0,
         stockType: l.stockType.trim() || undefined,
@@ -386,7 +391,7 @@ export default function PurchasesPage() {
                     </div>
                     <div>
                       <label className="block text-xs text-slate-600">
-                        Batch number
+                        Batch number *
                       </label>
                       <input
                         type="text"

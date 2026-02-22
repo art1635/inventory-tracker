@@ -32,6 +32,14 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
+    for (const item of items) {
+      if (!item.batchNumber?.trim()) {
+        return NextResponse.json(
+          { error: "Batch number is required for every line item" },
+          { status: 400 }
+        );
+      }
+    }
 
     let resolvedSupplierId: string;
     if (newSupplier?.name?.trim()) {
@@ -76,7 +84,7 @@ export async function POST(request: Request) {
           productId: item.productId,
           quantity: units,
           unitPrice: Number(item.unitPrice) || 0,
-          batchNumber: item.batchNumber?.trim() || null,
+          batchNumber: item.batchNumber!.trim(),
           ratePerLitre: item.ratePerLitre != null ? Number(item.ratePerLitre) : null,
           unitsReceived: units,
           stockType: item.stockType?.trim() || null,

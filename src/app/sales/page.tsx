@@ -10,6 +10,7 @@ type Sale = {
   reference: string | null;
   notes: string | null;
   total: number;
+  gstPerc?: number | null;
   customer: { id: string; name: string };
   items: {
     productId: string;
@@ -53,6 +54,7 @@ export default function SalesPage() {
   const [reference, setReference] = useState("");
   const [notes, setNotes] = useState("");
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [gstPerc, setGstPerc] = useState(18);
   const [lines, setLines] = useState<LineState[]>([{ ...emptyLine }]);
   const [batchesByProduct, setBatchesByProduct] = useState<Record<string, string[]>>({});
 
@@ -121,6 +123,11 @@ export default function SalesPage() {
       alert("Add at least one product with total units dispatched > 0");
       return;
     }
+    const missingBatch = items.some((l) => !l.batchNumber?.trim());
+    if (missingBatch) {
+      alert("Batch is required for every line item.");
+      return;
+    }
     const body = {
       customerId: customerId === "__new__" ? undefined : customerId,
       ...(customerId === "__new__" &&
@@ -135,9 +142,10 @@ export default function SalesPage() {
       reference: reference.trim() || null,
       notes: notes.trim() || null,
       date,
+      gstPerc: Number(gstPerc) || 0,
       items: items.map((l) => ({
         productId: l.productId,
-        batchNumber: l.batchNumber.trim() || undefined,
+        batchNumber: l.batchNumber.trim(),
         quantity: l.quantity,
         stockType: l.stockType.trim() || undefined,
         unitPrice: Number(l.unitPrice) || 0,
@@ -163,6 +171,7 @@ export default function SalesPage() {
     setReference("");
     setNotes("");
     setDate(new Date().toISOString().slice(0, 10));
+    setGstPerc(18);
     setLines([{ ...emptyLine }]);
     setShowForm(false);
     setEditingSaleId(null);
@@ -179,6 +188,7 @@ export default function SalesPage() {
     setReference(sale.reference ?? "");
     setNotes(sale.notes ?? "");
     setDate(sale.date.slice(0, 10));
+    setGstPerc(sale.gstPerc ?? 18);
     setLines(
       sale.items.length > 0
         ? sale.items.map((it) => ({
@@ -318,6 +328,18 @@ export default function SalesPage() {
                 className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
               />
             </div>
+            <div>
+              <label className="block text-sm text-slate-600">GST %</label>
+              <input
+                type="number"
+                min="0"
+                max="100"
+                step="0.01"
+                value={gstPerc}
+                onChange={(e) => setGstPerc(Number(e.target.value) || 0)}
+                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              />
+            </div>
             <div className="sm:col-span-2">
               <label className="block text-sm text-slate-600">Notes</label>
               <input
@@ -369,7 +391,7 @@ export default function SalesPage() {
                     </div>
                     <div>
                       <label className="block text-xs text-slate-600">
-                        Batch
+                        Batch *
                       </label>
                       <select
                         value={line.batchNumber}
