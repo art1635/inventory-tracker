@@ -49,10 +49,10 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
-    const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(firstSheet, {
+    const rows = XLSX.utils.sheet_to_json(firstSheet, {
       header: 1,
       defval: "",
-    }) as unknown[][];
+    }) as unknown as unknown[][];
     if (rows.length < 2) {
       return NextResponse.json(
         { error: "Excel must have a header row and at least one data row." },
