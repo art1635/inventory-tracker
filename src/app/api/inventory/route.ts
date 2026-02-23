@@ -7,7 +7,29 @@ export async function GET() {
       include: { product: true },
       orderBy: { product: { name: "asc" } },
     });
-    return NextResponse.json(inventory);
+    const productIds = inventory.map((inv) => inv.productId);
+    const latestPurchaseItems = await prisma.purchaseItem.findMany({
+      where: { productId: { in: productIds } },
+      include: { purchase: true },
+      orderBy: { purchase: { date: "desc" } },
+    });
+    const byProduct: Record<string, { batchNumber: string | null; manufacturingDate: string | null }> = {};
+    for (const pi of latestPurchaseItems) {
+      if (byProduct[pi.productId] == null) {
+        byProduct[pi.productId] = {
+          batchNumber: pi.batchNumber ?? null,
+          manufacturingDate: pi.purchase.manufacturingDate
+            ? pi.purchase.manufacturingDate.toISOString().slice(0, 10)
+            : null,
+        };
+      }
+    }
+    const enriched = inventory.map((inv) => ({
+      ...inv,
+      batchNumber: byProduct[inv.productId]?.batchNumber ?? null,
+      manufacturingDate: byProduct[inv.productId]?.manufacturingDate ?? null,
+    }));
+    return NextResponse.json(enriched);
   } catch (e) {
     console.error(e);
     return NextResponse.json(

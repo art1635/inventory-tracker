@@ -30,6 +30,20 @@ export default function ProductsPage() {
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<{ created: number; createdNames: string[]; errors?: { row: number; message: string }[] } | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const searchLower = searchQuery.trim().toLowerCase();
+  const filteredProducts =
+    !searchLower
+      ? products
+      : products.filter(
+          (p) =>
+            p.name.toLowerCase().includes(searchLower) ||
+            (p.sku ?? "").toLowerCase().includes(searchLower) ||
+            (p.description ?? "").toLowerCase().includes(searchLower) ||
+            (p.unit ?? "").toLowerCase().includes(searchLower) ||
+            (p.stockType ?? "").toLowerCase().includes(searchLower)
+        );
 
   const load = () =>
     fetch("/api/products")
@@ -374,7 +388,18 @@ export default function ProductsPage() {
         </form>
       )}
 
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+      <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div className="border-b border-slate-200 bg-slate-50 px-4 py-3">
+          <input
+            type="search"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search by name, SKU, description, unit or stock type..."
+            className="w-full max-w-md rounded-lg border border-slate-300 px-3 py-2 text-sm placeholder:text-slate-400 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+            aria-label="Search products"
+          />
+        </div>
+        <div className="overflow-hidden">
         <table className="min-w-full divide-y divide-slate-200">
           <thead className="bg-slate-50">
             <tr>
@@ -405,14 +430,16 @@ export default function ProductsPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-200">
-            {products.length === 0 ? (
+            {filteredProducts.length === 0 ? (
               <tr>
                 <td colSpan={8} className="px-4 py-8 text-center text-slate-500">
-                  No products yet. Add one above.
+                  {products.length === 0
+                    ? "No products yet. Add one above."
+                    : "No products match your search."}
                 </td>
               </tr>
             ) : (
-              (Array.isArray(products) ? products : []).map((p) => (
+              (Array.isArray(filteredProducts) ? filteredProducts : []).map((p) => (
                 <tr key={p.id} className="hover:bg-slate-50/50">
                   <td className="px-4 py-3 text-sm font-medium text-slate-900">
                     {p.name}
@@ -454,6 +481,7 @@ export default function ProductsPage() {
             )}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );

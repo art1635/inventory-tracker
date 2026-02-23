@@ -6,6 +6,8 @@ type InventoryItem = {
   id: string;
   quantity: number;
   litres: number; // total litres in stock
+  batchNumber?: string | null;
+  manufacturingDate?: string | null;
   product: {
     id: string;
     name: string;
@@ -83,6 +85,12 @@ export default function InventoryPage() {
               <th className="px-4 py-3 text-left text-xs font-medium text-slate-500">
                 SKU
               </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-slate-500">
+                Batch number
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-slate-500">
+                Date of manufacturing
+              </th>
               <th className="px-4 py-3 text-right text-xs font-medium text-slate-500">
                 Quantity
               </th>
@@ -97,7 +105,7 @@ export default function InventoryPage() {
           <tbody className="divide-y divide-slate-200">
             {filteredInventory.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-slate-500">
+                <td colSpan={7} className="px-4 py-8 text-center text-slate-500">
                   {inventory.length === 0
                     ? "No inventory yet. Add products and record purchases."
                     : "No products match your search. Try a different name or SKU."}
@@ -111,6 +119,12 @@ export default function InventoryPage() {
                   </td>
                   <td className="px-4 py-3 text-sm text-slate-600">
                     {item.product.sku ?? "—"}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-slate-600">
+                    {item.batchNumber ?? "—"}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-slate-600">
+                    {item.manufacturingDate ?? "—"}
                   </td>
                   <td className="px-4 py-3 text-right text-sm font-semibold text-slate-900">
                     {item.quantity}

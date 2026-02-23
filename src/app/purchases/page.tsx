@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type Supplier = { id: string; name: string };
 type Product = { id: string; name: string; unit: string; defaultRatePerLitre?: number | null };
@@ -8,6 +8,8 @@ type Purchase = {
   id: string;
   date: string;
   reference: string | null;
+  gstNumber?: string | null;
+  manufacturingDate?: string | null;
   notes: string | null;
   total: number;
   supplier: { id: string; name: string };
@@ -37,11 +39,28 @@ export default function PurchasesPage() {
   const [newSupplierPhone, setNewSupplierPhone] = useState("");
   const [newSupplierAddress, setNewSupplierAddress] = useState("");
   const [reference, setReference] = useState("");
+  const [gstNumber, setGstNumber] = useState("");
+  const [manufacturingDate, setManufacturingDate] = useState("");
   const [notes, setNotes] = useState("");
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [openProductLine, setOpenProductLine] = useState<number | null>(null);
+  const productDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (openProductLine === null) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (productDropdownRef.current && !productDropdownRef.current.contains(e.target as Node)) {
+        setOpenProductLine(null);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [openProductLine]);
+
   const [lines, setLines] = useState<
     {
       productId: string;
+      productSearch: string;
       batchNumber: string;
       ratePerLitre: string;
       unitsReceived: string;
@@ -51,6 +70,7 @@ export default function PurchasesPage() {
   >([
     {
       productId: "",
+      productSearch: "",
       batchNumber: "",
       ratePerLitre: "",
       unitsReceived: "",
@@ -88,6 +108,7 @@ export default function PurchasesPage() {
       ...prev,
       {
         productId: "",
+        productSearch: "",
         batchNumber: "",
         ratePerLitre: "",
         unitsReceived: "",
@@ -101,10 +122,13 @@ export default function PurchasesPage() {
       const next = [...prev];
       next[i] = { ...next[i], [field]: value };
       if (field === "productId") {
-        const product = products.find((p) => p.id === value);
+        const pid = value as string;
+        const product = products.find((p) => p.id === pid);
+        next[i].productSearch = product?.name ?? "";
         if (product?.defaultRatePerLitre != null) {
           next[i].ratePerLitre = String(product.defaultRatePerLitre);
         }
+        setOpenProductLine(null);
       }
       return next;
     });
@@ -142,6 +166,8 @@ export default function PurchasesPage() {
         },
       }),
       reference: reference.trim() || null,
+      gstNumber: gstNumber.trim() || null,
+      manufacturingDate: manufacturingDate.trim() || null,
       notes: notes.trim() || null,
       date,
       items: items.map((l) => ({
@@ -171,11 +197,14 @@ export default function PurchasesPage() {
     setNewSupplierPhone("");
     setNewSupplierAddress("");
     setReference("");
+    setGstNumber("");
+    setManufacturingDate("");
     setNotes("");
     setDate(new Date().toISOString().slice(0, 10));
     setLines([
       {
         productId: "",
+        productSearch: "",
         batchNumber: "",
         ratePerLitre: "",
         unitsReceived: "",
@@ -196,12 +225,15 @@ export default function PurchasesPage() {
     setNewSupplierPhone("");
     setNewSupplierAddress("");
     setReference(purchase.reference ?? "");
+    setGstNumber(purchase.gstNumber ?? "");
+    setManufacturingDate(purchase.manufacturingDate ? purchase.manufacturingDate.slice(0, 10) : "");
     setNotes(purchase.notes ?? "");
     setDate(purchase.date.slice(0, 10));
     setLines(
       purchase.items.length > 0
         ? purchase.items.map((it) => ({
             productId: it.productId,
+            productSearch: it.product?.name ?? "",
             batchNumber: it.batchNumber ?? "",
             ratePerLitre: it.ratePerLitre != null ? String(it.ratePerLitre) : "",
             unitsReceived: String(it.unitsReceived ?? it.quantity),
@@ -211,6 +243,7 @@ export default function PurchasesPage() {
         : [
             {
               productId: "",
+              productSearch: "",
               batchNumber: "",
               ratePerLitre: "",
               unitsReceived: "",
@@ -333,10 +366,29 @@ export default function PurchasesPage() {
               />
             </div>
             <div>
-              <label className="block text-sm text-slate-600">Reference (PO #)</label>
+              <label className="block text-sm text-slate-600">Invoice number</label>
               <input
                 value={reference}
                 onChange={(e) => setReference(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                placeholder="Invoice #"
+              />
+            </div>
+            <div>
+              <label className="block text-sm text-slate-600">GST number</label>
+              <input
+                value={gstNumber}
+                onChange={(e) => setGstNumber(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                placeholder="e.g. 27AABCU9603R1ZM"
+              />
+            </div>
+            <div>
+              <label className="block text-sm text-slate-600">Date of manufacturing</label>
+              <input
+                type="date"
+                value={manufacturingDate}
+                onChange={(e) => setManufacturingDate(e.target.value)}
                 className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
               />
             </div>
@@ -370,24 +422,66 @@ export default function PurchasesPage() {
                     Line {i + 1}
                   </div>
                   <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
-                    <div>
+                    <div className="relative lg:col-span-2" ref={openProductLine === i ? productDropdownRef : null}>
                       <label className="block text-xs text-slate-600">
                         Product (Product Master) *
                       </label>
-                      <select
-                        value={line.productId}
-                        onChange={(e) =>
-                          updateLine(i, "productId", e.target.value)
-                        }
-                        className="mt-0.5 w-full rounded border border-slate-300 px-2 py-1.5 text-sm"
+                      <button
+                        type="button"
+                        onClick={() => setOpenProductLine((prev) => (prev === i ? null : i))}
+                        className="mt-0.5 flex w-full items-center justify-between rounded border border-slate-300 bg-white px-2 py-1.5 text-left text-sm text-slate-900"
                       >
-                        <option value="">Select product</option>
-                        {(Array.isArray(products) ? products : []).map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {p.name}
-                          </option>
-                        ))}
-                      </select>
+                        <span className={line.productId ? "" : "text-slate-500"}>
+                          {line.productId
+                            ? (products.find((p) => p.id === line.productId)?.name ?? (line.productSearch || "Select product"))
+                            : "Select product"}
+                        </span>
+                        <span className="text-slate-400 text-xs" aria-hidden>v</span>
+                      </button>
+                      {openProductLine === i && (
+                        <div className="absolute left-0 top-full z-10 mt-0.5 w-full rounded border border-slate-200 bg-white shadow-lg">
+                          <input
+                            type="text"
+                            value={line.productSearch}
+                            onChange={(e) =>
+                              setLines((prev) => {
+                                const next = [...prev];
+                                next[i] = { ...next[i], productSearch: e.target.value };
+                                return next;
+                              })
+                            }
+                            placeholder="Search products..."
+                            className="w-full border-b border-slate-200 px-2 py-1.5 text-sm placeholder:text-slate-400 focus:outline-none"
+                            autoFocus
+                          />
+                          <ul className="max-h-48 overflow-y-auto py-1">
+                            {(Array.isArray(products) ? products : [])
+                              .filter((p) =>
+                                !line.productSearch.trim()
+                                  ? true
+                                  : p.name.toLowerCase().includes(line.productSearch.trim().toLowerCase())
+                              )
+                              .map((p) => (
+                                <li key={p.id}>
+                                  <button
+                                    type="button"
+                                    onClick={() => updateLine(i, "productId", p.id)}
+                                    className={`w-full px-2 py-1.5 text-left text-sm hover:bg-slate-100 ${line.productId === p.id ? "bg-teal-50 text-teal-800" : ""}`}
+                                  >
+                                    {p.name}
+                                  </button>
+                                </li>
+                              ))}
+                            {((Array.isArray(products) ? products : []).filter((p) =>
+                              !line.productSearch.trim()
+                                ? true
+                                : p.name.toLowerCase().includes(line.productSearch.trim().toLowerCase())
+                            ).length === 0) && (
+                              <li className="px-2 py-2 text-sm text-slate-500">No products match</li>
+                            )}
+                          </ul>
+                        </div>
+                      )}
                     </div>
                     <div>
                       <label className="block text-xs text-slate-600">
@@ -486,7 +580,7 @@ export default function PurchasesPage() {
                 Supplier
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-slate-500">
-                Reference
+                Invoice number
               </th>
               <th className="px-4 py-3 text-right text-xs font-medium text-slate-500">
                 Total

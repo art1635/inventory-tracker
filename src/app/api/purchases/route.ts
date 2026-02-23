@@ -25,7 +25,7 @@ const NEW_SUPPLIER = "__new__";
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { supplierId, newSupplier, reference, notes, date, items } = body;
+    const { supplierId, newSupplier, reference, notes, date, gstNumber, manufacturingDate, items } = body;
     if (!Array.isArray(items) || items.length === 0) {
       return NextResponse.json(
         { error: "At least one item is required" },
@@ -98,6 +98,8 @@ export async function POST(request: Request) {
         data: {
           supplierId: resolvedSupplierId,
           reference: reference?.trim() || null,
+          gstNumber: gstNumber?.trim() || null,
+          manufacturingDate: manufacturingDate ? new Date(manufacturingDate) : null,
           notes: notes?.trim() || null,
           total: 0,
           ...(date && { date: new Date(date) }),

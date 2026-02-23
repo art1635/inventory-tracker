@@ -96,7 +96,7 @@ export async function PATCH(
     }
 
     const body = await request.json();
-    const { supplierId, newSupplier, reference, notes, date, items } = body;
+    const { supplierId, newSupplier, reference, notes, date, gstNumber, manufacturingDate, items } = body;
     if (!Array.isArray(items) || items.length === 0) {
       return NextResponse.json(
         { error: "At least one item is required" },
@@ -186,6 +186,8 @@ export async function PATCH(
         data: {
           supplierId: resolvedSupplierId,
           reference: reference?.trim() || null,
+          ...(gstNumber !== undefined && { gstNumber: gstNumber?.trim() || null }),
+          ...(manufacturingDate !== undefined && { manufacturingDate: manufacturingDate ? new Date(manufacturingDate) : null }),
           notes: notes?.trim() || null,
           total: 0,
           ...(date && { date: new Date(date) }),
