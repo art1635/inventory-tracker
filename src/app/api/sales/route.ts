@@ -79,7 +79,13 @@ export async function POST(request: Request) {
     for (const item of items) {
       const qty = Math.max(0, Number(item.quantity) || 0);
       const price = Number(item.unitPrice) || 0;
-      const lineTotal = qty * price;
+      const product = await prisma.product.findUnique({
+        where: { id: item.productId },
+        select: { litres: true },
+      });
+      const litresPerUnit = product?.litres ?? 0;
+      const lineTotal =
+        litresPerUnit > 0 ? (qty * litresPerUnit) * price : qty * price;
       subtotal += lineTotal;
       lineItems.push({
         productId: item.productId,

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 type Customer = { id: string; name: string };
-type Product = { id: string; name: string; unit: string };
+type Product = { id: string; name: string; unit: string; litres?: number | null };
 type Sale = {
   id: string;
   date: string;
@@ -498,7 +498,7 @@ export default function SalesPage() {
                     </div>
                     <div>
                       <label className="block text-xs text-slate-600">
-                        Selling price
+                        Sale price per litre
                       </label>
                       <input
                         type="number"
@@ -531,10 +531,15 @@ export default function SalesPage() {
             </div>
           </div>
           {(() => {
-            const subtotal = lines.reduce(
-              (sum, l) => sum + (Number(l.quantity) || 0) * (Number(l.unitPrice) || 0),
-              0
-            );
+            const subtotal = lines.reduce((sum, l) => {
+              const qty = Number(l.quantity) || 0;
+              const price = Number(l.unitPrice) || 0;
+              const product = (Array.isArray(products) ? products : []).find((p) => p.id === l.productId);
+              const litresPerUnit = product?.litres ?? 0;
+              const lineTotal =
+                litresPerUnit > 0 ? (qty * litresPerUnit) * price : qty * price;
+              return sum + lineTotal;
+            }, 0);
             const gstPct = Number(gstPerc) || 0;
             const gstAmount = subtotal * (gstPct / 100);
             const totalInclGst = subtotal + gstAmount;
