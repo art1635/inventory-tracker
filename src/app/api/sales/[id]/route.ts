@@ -161,18 +161,41 @@ export async function PATCH(
     const total = subtotal * (1 + gst / 100);
 
     const updated = await prisma.$transaction(async (tx) => {
+      // Restore inventory from the existing sale first (so we don't fail when qty unchanged)
+      const restoreByProduct = new Map<
+        string,
+        { quantity: number; litres: number }
+      >();
       for (const item of sale.items) {
-        const inv = await tx.inventory.findUnique({
-          where: { productId: item.productId },
-        });
         const litresPerUnit = item.product?.litres ?? 0;
         const litresToAdd = item.quantity * litresPerUnit;
+        const cur = restoreByProduct.get(item.productId) ?? {
+          quantity: 0,
+          litres: 0,
+        };
+        restoreByProduct.set(item.productId, {
+          quantity: cur.quantity + item.quantity,
+          litres: cur.litres + litresToAdd,
+        });
+      }
+      for (const [productId, { quantity: addQty, litres: addLitres }] of restoreByProduct) {
+        const inv = await tx.inventory.findUnique({
+          where: { productId },
+        });
         if (inv) {
           await tx.inventory.update({
-            where: { productId: item.productId },
+            where: { productId },
             data: {
-              quantity: inv.quantity + item.quantity,
-              litres: inv.litres + litresToAdd,
+              quantity: inv.quantity + addQty,
+              litres: inv.litres + addLitres,
+            },
+          });
+        } else {
+          await tx.inventory.create({
+            data: {
+              productId,
+              quantity: addQty,
+              litres: addLitres,
             },
           });
         }
