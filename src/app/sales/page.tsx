@@ -263,8 +263,21 @@ export default function SalesPage() {
         <button
           type="button"
           onClick={() => {
-            setShowForm(!showForm);
-            if (showForm) setEditingSaleId(null);
+            if (showForm) {
+              setShowForm(false);
+              setEditingSaleId(null);
+            } else {
+              setEditingSaleId(null);
+              setCustomerId("");
+              setNewCustomerName("");
+              setNewCustomerGstNumber("");
+              setReference("");
+              setNotes("");
+              setDate(new Date().toISOString().slice(0, 10));
+              setGstPerc(18);
+              setLines([{ ...emptyLine }]);
+              setShowForm(true);
+            }
           }}
           className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700"
         >
