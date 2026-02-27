@@ -90,11 +90,11 @@ export default function SuppliersPage() {
         </div>
       )}
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <h1 className="text-2xl font-semibold text-slate-900">Suppliers</h1>
+        <h1 className="text-3xl font-bold tracking-tight text-slate-800">Suppliers</h1>
         <button
           type="button"
           onClick={() => setShowForm(!showForm)}
-          className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700"
+          className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white shadow-md hover:bg-teal-700 hover:shadow-lg transition-all"
         >
           {showForm ? "Cancel" : "Add supplier"}
         </button>
@@ -103,7 +103,7 @@ export default function SuppliersPage() {
       {showForm && (
         <form
           onSubmit={handleSubmit}
-          className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm"
+          className="rounded-xl border border-slate-200 bg-white p-6 shadow-md"
         >
           <h2 className="mb-4 text-sm font-medium text-slate-700">
             New supplier
@@ -132,7 +132,7 @@ export default function SuppliersPage() {
           <div className="mt-4">
             <button
               type="submit"
-              className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700"
+              className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white shadow-md hover:bg-teal-700 hover:shadow-lg transition-all"
             >
               Save supplier
             </button>
@@ -140,7 +140,7 @@ export default function SuppliersPage() {
         </form>
       )}
 
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-md">
         <table className="min-w-full divide-y divide-slate-200">
           <thead className="bg-slate-50">
             <tr>

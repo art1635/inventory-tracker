@@ -292,14 +292,14 @@ export default function PurchasesPage() {
         </div>
       )}
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <h1 className="text-2xl font-semibold text-slate-900">Purchases</h1>
+        <h1 className="text-3xl font-bold tracking-tight text-slate-800">Purchases</h1>
         <button
           type="button"
           onClick={() => {
             setShowForm(!showForm);
             if (showForm) setEditingPurchaseId(null);
           }}
-          className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700"
+          className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white shadow-md hover:bg-teal-700 hover:shadow-lg transition-all"
         >
           {showForm ? "Cancel" : "Record purchase"}
         </button>
@@ -308,7 +308,7 @@ export default function PurchasesPage() {
       {showForm && (
         <form
           onSubmit={handleSubmit}
-          className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm"
+          className="rounded-xl border border-slate-200 bg-white p-6 shadow-md"
         >
           <h2 className="mb-4 text-sm font-medium text-slate-700">
             {editingPurchaseId ? "Edit purchase — inventory will be adjusted" : "New purchase (from supplier) — inventory will increase"}
@@ -571,7 +571,7 @@ export default function PurchasesPage() {
           <div className="mt-4">
             <button
               type="submit"
-              className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700"
+              className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white shadow-md hover:bg-teal-700 hover:shadow-lg transition-all"
             >
               {editingPurchaseId ? "Update purchase" : "Save purchase"}
             </button>
@@ -580,7 +580,7 @@ export default function PurchasesPage() {
       )}
 
       {!showForm && (
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-md">
         <table className="min-w-full divide-y divide-slate-200">
           <thead className="bg-slate-50">
             <tr>

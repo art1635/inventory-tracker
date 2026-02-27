@@ -75,7 +75,7 @@ export default function InventoryPage() {
           </button>
         </div>
       )}
-      <h1 className="text-2xl font-semibold text-slate-900">Inventory</h1>
+      <h1 className="text-3xl font-bold tracking-tight text-slate-800">Inventory</h1>
       <p className="text-sm text-slate-600">
         Current stock. Total litres updates on purchase/sale.
       </p>
@@ -99,7 +99,7 @@ export default function InventoryPage() {
         )}
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-md">
         <table className="min-w-full divide-y divide-slate-200">
           <thead className="bg-slate-50">
             <tr>

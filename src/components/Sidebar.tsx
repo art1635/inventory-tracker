@@ -16,25 +16,25 @@ const nav = [
 export function Sidebar() {
   const pathname = usePathname();
   return (
-    <aside className="w-56 shrink-0 border-r border-slate-200 bg-white">
+    <aside className="w-60 shrink-0 bg-teal-800 shadow-lg">
       <div className="sticky top-0 flex h-screen flex-col py-6">
         <Link
           href="/"
-          className="px-6 pb-4 text-lg font-semibold text-teal-700"
+          className="mx-4 rounded-lg bg-teal-700/50 px-4 py-3 text-base font-bold tracking-tight text-white transition-colors hover:bg-teal-700"
         >
           Inventory Tracker
         </Link>
-        <nav className="flex flex-1 flex-col gap-0.5 px-3">
+        <nav className="mt-6 flex flex-1 flex-col gap-1 px-3">
           {nav.map((item) => {
             const active = pathname === item.href;
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                className={`rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
                   active
-                    ? "bg-teal-50 text-teal-800"
-                    : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                    ? "bg-teal-600 text-white shadow-inner"
+                    : "text-teal-100 hover:bg-teal-700/60 hover:text-white"
                 }`}
               >
                 {item.label}

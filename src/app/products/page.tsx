@@ -221,7 +221,7 @@ export default function ProductsPage() {
         </div>
       )}
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <h1 className="text-2xl font-semibold text-slate-900">Product Master</h1>
+        <h1 className="text-3xl font-bold tracking-tight text-slate-800">Product Master</h1>
         <div className="flex flex-wrap items-center gap-2">
           <form
             onSubmit={handleImport}
@@ -273,7 +273,7 @@ export default function ProductsPage() {
                 setShowForm(true);
               }
             }}
-            className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700"
+            className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white shadow-md hover:bg-teal-700 hover:shadow-lg transition-all"
           >
             {showForm ? "Cancel" : "Add product"}
           </button>
@@ -304,7 +304,7 @@ export default function ProductsPage() {
       {showForm && (
         <form
           onSubmit={handleSubmit}
-          className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm"
+          className="rounded-xl border border-slate-200 bg-white p-6 shadow-md"
         >
           <h2 className="mb-4 text-sm font-medium text-slate-700">
             {editingId ? "Edit product" : "New product (Product Master)"}
@@ -402,7 +402,7 @@ export default function ProductsPage() {
           <div className="mt-4">
             <button
               type="submit"
-              className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700"
+              className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white shadow-md hover:bg-teal-700 hover:shadow-lg transition-all"
             >
               {editingId ? "Update product" : "Save product"}
             </button>
