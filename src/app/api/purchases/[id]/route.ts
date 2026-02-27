@@ -96,7 +96,7 @@ export async function PATCH(
     }
 
     const body = await request.json();
-    const { supplierId, newSupplier, reference, notes, date, gstNumber, manufacturingDate, items } = body;
+    const { supplierId, newSupplier, reference, notes, date, gstNumber, items } = body;
     if (!Array.isArray(items) || items.length === 0) {
       return NextResponse.json(
         { error: "At least one item is required" },
@@ -116,6 +116,12 @@ export async function PATCH(
     let resolvedSupplierId: string;
     if (newSupplier?.name?.trim()) {
       const name = newSupplier.name.trim();
+      if (!newSupplier.gstNumber?.trim()) {
+        return NextResponse.json(
+          { error: "GST Number is required for the new supplier" },
+          { status: 400 }
+        );
+      }
       const existing = await prisma.supplier.findFirst({ where: { name } });
       if (existing) {
         resolvedSupplierId = existing.id;
@@ -123,9 +129,7 @@ export async function PATCH(
         const created = await prisma.supplier.create({
           data: {
             name,
-            email: newSupplier.email?.trim() || null,
-            phone: newSupplier.phone?.trim() || null,
-            address: newSupplier.address?.trim() || null,
+            gstNumber: newSupplier.gstNumber.trim(),
           },
         });
         resolvedSupplierId = created.id;
@@ -148,6 +152,7 @@ export async function PATCH(
         ratePerLitre?: number;
         unitsReceived?: number;
         stockType?: string;
+        manufacturingDate?: string | null;
       }) => {
         const units = Math.max(0, Number(item.unitsReceived ?? item.quantity) || 0);
         return {
@@ -158,6 +163,7 @@ export async function PATCH(
           ratePerLitre: item.ratePerLitre != null ? Number(item.ratePerLitre) : null,
           unitsReceived: units,
           stockType: item.stockType?.trim() || null,
+          manufacturingDate: item.manufacturingDate ? new Date(item.manufacturingDate) : null,
         };
       }
     );
@@ -187,7 +193,6 @@ export async function PATCH(
           supplierId: resolvedSupplierId,
           reference: reference?.trim() || null,
           ...(gstNumber !== undefined && { gstNumber: gstNumber?.trim() || null }),
-          ...(manufacturingDate !== undefined && { manufacturingDate: manufacturingDate ? new Date(manufacturingDate) : null }),
           notes: notes?.trim() || null,
           total: 0,
           ...(date && { date: new Date(date) }),
@@ -225,6 +230,7 @@ export async function PATCH(
             ratePerLitre: ratePerLitre > 0 ? ratePerLitre : raw.ratePerLitre,
             unitsReceived: raw.unitsReceived,
             stockType: raw.stockType,
+            manufacturingDate: raw.manufacturingDate,
           },
         });
         const litresToAdd = raw.quantity * litresPerUnit;

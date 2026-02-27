@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 type Customer = { id: string; name: string };
 type Product = { id: string; name: string; unit: string };
@@ -19,12 +19,13 @@ type Sale = {
     total: number;
     batchNumber: string | null;
     stockType: string | null;
-    product: { name: string };
+    product: { name: string; litres?: number | null };
   }[];
 };
 
 type LineState = {
   productId: string;
+  productSearch: string;
   batchNumber: string;
   quantity: number;
   stockType: string;
@@ -33,6 +34,7 @@ type LineState = {
 
 const emptyLine: LineState = {
   productId: "",
+  productSearch: "",
   batchNumber: "",
   quantity: 0,
   stockType: "",
@@ -46,17 +48,19 @@ export default function SalesPage() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingSaleId, setEditingSaleId] = useState<string | null>(null);
+  const [saleDetail, setSaleDetail] = useState<Sale | null>(null);
   const [customerId, setCustomerId] = useState("");
   const [newCustomerName, setNewCustomerName] = useState("");
-  const [newCustomerEmail, setNewCustomerEmail] = useState("");
-  const [newCustomerPhone, setNewCustomerPhone] = useState("");
-  const [newCustomerAddress, setNewCustomerAddress] = useState("");
+  const [newCustomerGstNumber, setNewCustomerGstNumber] = useState("");
   const [reference, setReference] = useState("");
   const [notes, setNotes] = useState("");
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [gstPerc, setGstPerc] = useState(18);
   const [lines, setLines] = useState<LineState[]>([{ ...emptyLine }]);
   const [batchesByProduct, setBatchesByProduct] = useState<Record<string, string[]>>({});
+  const [openProductLine, setOpenProductLine] = useState<number | null>(null);
+  const productDropdownRef = useRef<HTMLDivElement>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const fetchBatches = useCallback(async (productId: string) => {
     if (!productId) return [];
@@ -65,28 +69,41 @@ export default function SalesPage() {
     return (data.batches ?? []) as string[];
   }, []);
 
+  useEffect(() => {
+    if (openProductLine === null) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (productDropdownRef.current && !productDropdownRef.current.contains(e.target as Node)) {
+        setOpenProductLine(null);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [openProductLine]);
+
   const load = () => {
-    fetch("/api/sales").then((r) => r.json()).then((json) => setSales(Array.isArray(json) ? json : [])).catch(() => setSales([]));
-    fetch("/api/customers").then((r) => r.json()).then((json) => setCustomers(Array.isArray(json) ? json : [])).catch(() => setCustomers([]));
+    setLoadError(null);
+    Promise.all([
+      fetch("/api/sales").then((r) => r.json().then((json) => ({ ok: r.ok, json }))),
+      fetch("/api/customers").then((r) => r.json().then((json) => ({ ok: r.ok, json }))),
+      fetch("/api/products").then((r) => r.json().then((json) => ({ ok: r.ok, json }))),
+    ])
+      .then(([s, c, prod]) => {
+        const err: string[] = [];
+        if (s.ok && Array.isArray(s.json)) setSales(s.json);
+        else err.push((s.json as { error?: string })?.error || "sales");
+        if (c.ok && Array.isArray(c.json)) setCustomers(c.json);
+        else err.push((c.json as { error?: string })?.error || "customers");
+        if (prod.ok && Array.isArray(prod.json)) setProducts(prod.json);
+        else err.push((prod.json as { error?: string })?.error || "products");
+        setLoadError(err.length ? (err.length === 1 ? err[0] : "Failed to load data. Check your connection and retry.") : null);
+      })
+      .catch(() => setLoadError("Failed to load data. Check your connection and retry."))
+      .finally(() => setLoading(false));
   };
 
   useEffect(() => {
-    Promise.all([
-      fetch("/api/sales").then((r) => r.json()),
-      fetch("/api/customers").then((r) => r.json()),
-      fetch("/api/products").then((r) => r.json()),
-    ])
-      .then(([s, c, prod]) => {
-        setSales(Array.isArray(s) ? s : []);
-        setCustomers(Array.isArray(c) ? c : []);
-        setProducts(Array.isArray(prod) ? prod : []);
-      })
-      .catch(() => {
-        setSales([]);
-        setCustomers([]);
-        setProducts([]);
-      })
-      .finally(() => setLoading(false));
+    setLoading(true);
+    load();
   }, []);
 
   const addLine = () => {
@@ -97,6 +114,8 @@ export default function SalesPage() {
       const next = [...prev];
       next[i] = { ...next[i], [field]: value };
       if (field === "productId") {
+        const product = products.find((p) => p.id === (value as string));
+        next[i].productSearch = product?.name ?? "";
         next[i].batchNumber = "";
         const pid = value as string;
         if (pid && !batchesByProduct[pid]) {
@@ -104,6 +123,7 @@ export default function SalesPage() {
             setBatchesByProduct((b) => ({ ...b, [pid]: batches }))
           );
         }
+        setOpenProductLine(null);
       }
       return next;
     });
@@ -134,9 +154,7 @@ export default function SalesPage() {
         newCustomerName.trim() && {
           newCustomer: {
             name: newCustomerName.trim(),
-            email: newCustomerEmail.trim() || undefined,
-            phone: newCustomerPhone.trim() || undefined,
-            address: newCustomerAddress.trim() || undefined,
+            gstNumber: newCustomerGstNumber.trim() || undefined,
           },
         }),
       reference: reference.trim() || null,
@@ -165,9 +183,7 @@ export default function SalesPage() {
     }
     setCustomerId("");
     setNewCustomerName("");
-    setNewCustomerEmail("");
-    setNewCustomerPhone("");
-    setNewCustomerAddress("");
+    setNewCustomerGstNumber("");
     setReference("");
     setNotes("");
     setDate(new Date().toISOString().slice(0, 10));
@@ -182,9 +198,7 @@ export default function SalesPage() {
     setEditingSaleId(sale.id);
     setCustomerId(sale.customer.id);
     setNewCustomerName("");
-    setNewCustomerEmail("");
-    setNewCustomerPhone("");
-    setNewCustomerAddress("");
+    setNewCustomerGstNumber("");
     setReference(sale.reference ?? "");
     setNotes(sale.notes ?? "");
     setDate(sale.date.slice(0, 10));
@@ -193,6 +207,7 @@ export default function SalesPage() {
       sale.items.length > 0
         ? sale.items.map((it) => ({
             productId: it.productId,
+            productSearch: it.product?.name ?? "",
             batchNumber: it.batchNumber ?? "",
             quantity: it.quantity,
             stockType: it.stockType ?? "",
@@ -231,6 +246,18 @@ export default function SalesPage() {
 
   return (
     <div className="space-y-6">
+      {loadError && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-4 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-amber-800">{loadError}</p>
+          <button
+            type="button"
+            onClick={() => { setLoadError(null); setLoading(true); load(); }}
+            className="rounded-lg bg-amber-200 px-3 py-1.5 text-sm font-medium text-amber-900 hover:bg-amber-300"
+          >
+            Retry
+          </button>
+        </div>
+      )}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h1 className="text-2xl font-semibold text-slate-900">Sales</h1>
         <button
@@ -282,29 +309,10 @@ export default function SalesPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm text-slate-600">Email</label>
+                  <label className="block text-sm text-slate-600">GST number</label>
                   <input
-                    type="email"
-                    value={newCustomerEmail}
-                    onChange={(e) => setNewCustomerEmail(e.target.value)}
-                    className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                    placeholder="Optional"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm text-slate-600">Phone</label>
-                  <input
-                    value={newCustomerPhone}
-                    onChange={(e) => setNewCustomerPhone(e.target.value)}
-                    className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                    placeholder="Optional"
-                  />
-                </div>
-                <div className="sm:col-span-2">
-                  <label className="block text-sm text-slate-600">Address</label>
-                  <input
-                    value={newCustomerAddress}
-                    onChange={(e) => setNewCustomerAddress(e.target.value)}
+                    value={newCustomerGstNumber}
+                    onChange={(e) => setNewCustomerGstNumber(e.target.value)}
                     className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
                     placeholder="Optional"
                   />
@@ -370,24 +378,66 @@ export default function SalesPage() {
                     Line {i + 1}
                   </div>
                   <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
-                    <div>
+                    <div className="relative lg:col-span-2" ref={openProductLine === i ? productDropdownRef : null}>
                       <label className="block text-xs text-slate-600">
                         Product (Product Master) *
                       </label>
-                      <select
-                        value={line.productId}
-                        onChange={(e) =>
-                          updateLine(i, "productId", e.target.value)
-                        }
-                        className="mt-0.5 w-full rounded border border-slate-300 px-2 py-1.5 text-sm"
+                      <button
+                        type="button"
+                        onClick={() => setOpenProductLine((prev) => (prev === i ? null : i))}
+                        className="mt-0.5 flex w-full items-center justify-between rounded border border-slate-300 bg-white px-2 py-1.5 text-left text-sm text-slate-900"
                       >
-                        <option value="">Select product</option>
-                        {(Array.isArray(products) ? products : []).map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {p.name}
-                          </option>
-                        ))}
-                      </select>
+                        <span className={line.productId ? "" : "text-slate-500"}>
+                          {line.productId
+                            ? (products.find((p) => p.id === line.productId)?.name ?? (line.productSearch || "Select product"))
+                            : "Select product"}
+                        </span>
+                        <span className="text-slate-400 text-xs" aria-hidden>▼</span>
+                      </button>
+                      {openProductLine === i && (
+                        <div className="absolute left-0 top-full z-10 mt-0.5 w-full rounded border border-slate-200 bg-white shadow-lg">
+                          <input
+                            type="text"
+                            value={line.productSearch}
+                            onChange={(e) =>
+                              setLines((prev) => {
+                                const next = [...prev];
+                                next[i] = { ...next[i], productSearch: e.target.value };
+                                return next;
+                              })
+                            }
+                            placeholder="Search products..."
+                            className="w-full border-b border-slate-200 px-2 py-1.5 text-sm placeholder:text-slate-400 focus:outline-none"
+                            autoFocus
+                          />
+                          <ul className="max-h-48 overflow-y-auto py-1">
+                            {(Array.isArray(products) ? products : [])
+                              .filter((p) =>
+                                !line.productSearch.trim()
+                                  ? true
+                                  : p.name.toLowerCase().includes(line.productSearch.trim().toLowerCase())
+                              )
+                              .map((p) => (
+                                <li key={p.id}>
+                                  <button
+                                    type="button"
+                                    onClick={() => updateLine(i, "productId", p.id)}
+                                    className={`w-full px-2 py-1.5 text-left text-sm hover:bg-slate-100 ${line.productId === p.id ? "bg-teal-50 text-teal-800" : ""}`}
+                                  >
+                                    {p.name}
+                                  </button>
+                                </li>
+                              ))}
+                            {((Array.isArray(products) ? products : []).filter((p) =>
+                              !line.productSearch.trim()
+                                ? true
+                                : p.name.toLowerCase().includes(line.productSearch.trim().toLowerCase())
+                            ).length === 0) && (
+                              <li className="px-2 py-2 text-sm text-slate-500">No products match</li>
+                            )}
+                          </ul>
+                        </div>
+                      )}
                     </div>
                     <div>
                       <label className="block text-xs text-slate-600">
@@ -528,6 +578,7 @@ export default function SalesPage() {
         </form>
       )}
 
+      {!showForm && (
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         <table className="min-w-full divide-y divide-slate-200">
           <thead className="bg-slate-50">
@@ -566,7 +617,13 @@ export default function SalesPage() {
                     {s.customer.name}
                   </td>
                   <td className="px-4 py-3 text-sm text-slate-600">
-                    {s.reference ?? "—"}
+                    <button
+                      type="button"
+                      onClick={() => setSaleDetail(s)}
+                      className="text-teal-600 hover:underline text-left"
+                    >
+                      {s.reference ?? "—"}
+                    </button>
                   </td>
                   <td className="px-4 py-3 text-right text-sm font-medium text-slate-900">
                     ₹{s.total.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
@@ -595,6 +652,67 @@ export default function SalesPage() {
           </tbody>
         </table>
       </div>
+      )}
+
+      {saleDetail && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" aria-modal="true" role="dialog">
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-hidden rounded-xl bg-white shadow-xl">
+            <div className="border-b border-slate-200 bg-slate-50 px-4 py-3 flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-slate-900">Sale details</h3>
+              <button
+                type="button"
+                onClick={() => setSaleDetail(null)}
+                className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              >
+                Close
+              </button>
+            </div>
+            <div className="overflow-y-auto max-h-[calc(90vh-4rem)] p-4 space-y-4">
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div>
+                  <span className="text-slate-500">Date</span>
+                  <p className="font-medium text-slate-900">{new Date(saleDetail.date).toLocaleDateString()}</p>
+                </div>
+                <div>
+                  <span className="text-slate-500">Invoice number</span>
+                  <p className="font-medium text-slate-900">{saleDetail.reference ?? "—"}</p>
+                </div>
+              </div>
+              <div>
+                <h4 className="text-xs font-medium text-slate-500 mb-2">Line items</h4>
+                <table className="min-w-full divide-y divide-slate-200 text-sm">
+                  <thead className="bg-slate-50">
+                    <tr>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-slate-500">Product name</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-slate-500">Batch number</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-slate-500">DOM</th>
+                      <th className="px-3 py-2 text-right text-xs font-medium text-slate-500">Units</th>
+                      <th className="px-3 py-2 text-right text-xs font-medium text-slate-500">Sale price per litre</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200">
+                    {(saleDetail.items ?? []).map((item, idx) => {
+                      const litres = item.product?.litres ?? 0;
+                      const salePricePerLitre = litres > 0 ? item.unitPrice / litres : null;
+                      return (
+                        <tr key={idx}>
+                          <td className="px-3 py-2 text-slate-900">{item.product?.name ?? "—"}</td>
+                          <td className="px-3 py-2 text-slate-600">{item.batchNumber ?? "—"}</td>
+                          <td className="px-3 py-2 text-slate-600">—</td>
+                          <td className="px-3 py-2 text-right text-slate-900">{item.quantity}</td>
+                          <td className="px-3 py-2 text-right text-slate-900">
+                            {salePricePerLitre != null ? `₹${salePricePerLitre.toLocaleString("en-IN", { minimumFractionDigits: 2 })}` : "—"}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

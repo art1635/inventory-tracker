@@ -5,9 +5,7 @@ import { useEffect, useState } from "react";
 type Customer = {
   id: string;
   name: string;
-  email: string | null;
-  phone: string | null;
-  address: string | null;
+  gstNumber: string | null;
 };
 
 export default function CustomersPage() {
@@ -15,15 +13,23 @@ export default function CustomersPage() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
-  const [address, setAddress] = useState("");
+  const [gstNumber, setGstNumber] = useState("");
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  const load = () =>
-    fetch("/api/customers")
-      .then((r) => r.json())
-      .then((json) => setCustomers(Array.isArray(json) ? json : []))
-      .catch(() => setCustomers([]));
+  const load = () => {
+    setLoadError(null);
+    return fetch("/api/customers")
+      .then((r) => r.json().then((json) => ({ ok: r.ok, json })))
+      .then(({ ok, json }) => {
+        if (ok && Array.isArray(json)) {
+          setCustomers(json);
+          setLoadError(null);
+        } else {
+          setLoadError((json as { error?: string })?.error || "Failed to load customers");
+        }
+      })
+      .catch(() => setLoadError("Failed to load data. Check your connection and retry."));
+  };
 
   useEffect(() => {
     load().finally(() => setLoading(false));
@@ -36,9 +42,7 @@ export default function CustomersPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         name: name.trim(),
-        email: email.trim() || null,
-        phone: phone.trim() || null,
-        address: address.trim() || null,
+        gstNumber: gstNumber.trim() || null,
       }),
     });
     if (!res.ok) {
@@ -47,9 +51,7 @@ export default function CustomersPage() {
       return;
     }
     setName("");
-    setEmail("");
-    setPhone("");
-    setAddress("");
+    setGstNumber("");
     setShowForm(false);
     load();
   };
@@ -71,6 +73,18 @@ export default function CustomersPage() {
 
   return (
     <div className="space-y-6">
+      {loadError && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-4 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-amber-800">{loadError}</p>
+          <button
+            type="button"
+            onClick={() => { setLoadError(null); setLoading(true); load().finally(() => setLoading(false)); }}
+            className="rounded-lg bg-amber-200 px-3 py-1.5 text-sm font-medium text-amber-900 hover:bg-amber-300"
+          >
+            Retry
+          </button>
+        </div>
+      )}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h1 className="text-2xl font-semibold text-slate-900">Customers</h1>
         <button
@@ -101,28 +115,12 @@ export default function CustomersPage() {
               />
             </div>
             <div>
-              <label className="block text-sm text-slate-600">Email</label>
+              <label className="block text-sm text-slate-600">GST number</label>
               <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                value={gstNumber}
+                onChange={(e) => setGstNumber(e.target.value)}
                 className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-              />
-            </div>
-            <div>
-              <label className="block text-sm text-slate-600">Phone</label>
-              <input
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-              />
-            </div>
-            <div className="sm:col-span-2">
-              <label className="block text-sm text-slate-600">Address</label>
-              <input
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                placeholder="e.g. 27AABCU9603R1ZM"
               />
             </div>
           </div>
@@ -145,10 +143,7 @@ export default function CustomersPage() {
                 Name
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-slate-500">
-                Email
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-slate-500">
-                Phone
+                GST number
               </th>
               <th className="px-4 py-3 text-right text-xs font-medium text-slate-500">
                 Actions
@@ -158,7 +153,7 @@ export default function CustomersPage() {
           <tbody className="divide-y divide-slate-200">
             {customers.length === 0 ? (
               <tr>
-                <td colSpan={4} className="px-4 py-8 text-center text-slate-500">
+                <td colSpan={3} className="px-4 py-8 text-center text-slate-500">
                   No customers yet. Add one above.
                 </td>
               </tr>
@@ -169,10 +164,7 @@ export default function CustomersPage() {
                     {c.name}
                   </td>
                   <td className="px-4 py-3 text-sm text-slate-600">
-                    {c.email ?? "—"}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-slate-600">
-                    {c.phone ?? "—"}
+                    {c.gstNumber ?? "—"}
                   </td>
                   <td className="px-4 py-3 text-right">
                     <button

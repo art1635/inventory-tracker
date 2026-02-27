@@ -31,14 +31,18 @@ export async function PATCH(
   try {
     const { id } = await params;
     const body = await request.json();
-    const { name, email, phone, address } = body;
+    const { name, gstNumber } = body;
+    if (gstNumber !== undefined && !gstNumber?.trim()) {
+      return NextResponse.json(
+        { error: "GST Number is required" },
+        { status: 400 }
+      );
+    }
     const supplier = await prisma.supplier.update({
       where: { id },
       data: {
         ...(name !== undefined && { name: name?.trim() }),
-        ...(email !== undefined && { email: email?.trim() || null }),
-        ...(phone !== undefined && { phone: phone?.trim() || null }),
-        ...(address !== undefined && { address: address?.trim() || null }),
+        ...(gstNumber !== undefined && { gstNumber: gstNumber?.trim() || null }),
       },
     });
     return NextResponse.json(supplier);

@@ -19,19 +19,23 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { name, email, phone, address } = body;
+    const { name, gstNumber } = body;
     if (!name?.trim()) {
       return NextResponse.json(
         { error: "Supplier name is required" },
         { status: 400 }
       );
     }
+    if (!gstNumber?.trim()) {
+      return NextResponse.json(
+        { error: "GST Number is required" },
+        { status: 400 }
+      );
+    }
     const supplier = await prisma.supplier.create({
       data: {
         name: name.trim(),
-        email: email?.trim() || null,
-        phone: phone?.trim() || null,
-        address: address?.trim() || null,
+        gstNumber: gstNumber.trim(),
       },
     });
     return NextResponse.json(supplier);

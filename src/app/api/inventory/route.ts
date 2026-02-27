@@ -18,8 +18,8 @@ export async function GET() {
       if (byProduct[pi.productId] == null) {
         byProduct[pi.productId] = {
           batchNumber: pi.batchNumber ?? null,
-          manufacturingDate: pi.purchase.manufacturingDate
-            ? pi.purchase.manufacturingDate.toISOString().slice(0, 10)
+          manufacturingDate: pi.manufacturingDate
+            ? pi.manufacturingDate.toISOString().slice(0, 10)
             : null,
         };
       }

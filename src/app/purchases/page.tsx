@@ -2,14 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 
-type Supplier = { id: string; name: string };
+type Supplier = { id: string; name: string; gstNumber?: string | null };
 type Product = { id: string; name: string; unit: string; defaultRatePerLitre?: number | null };
 type Purchase = {
   id: string;
   date: string;
   reference: string | null;
   gstNumber?: string | null;
-  manufacturingDate?: string | null;
   notes: string | null;
   total: number;
   supplier: { id: string; name: string };
@@ -22,6 +21,7 @@ type Purchase = {
     ratePerLitre: number | null;
     unitsReceived: number | null;
     stockType: string | null;
+    manufacturingDate?: string | null;
     product: { name: string };
   }[];
 };
@@ -33,18 +33,17 @@ export default function PurchasesPage() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingPurchaseId, setEditingPurchaseId] = useState<string | null>(null);
+  const [purchaseDetail, setPurchaseDetail] = useState<Purchase | null>(null);
   const [supplierId, setSupplierId] = useState("");
   const [newSupplierName, setNewSupplierName] = useState("");
-  const [newSupplierEmail, setNewSupplierEmail] = useState("");
-  const [newSupplierPhone, setNewSupplierPhone] = useState("");
-  const [newSupplierAddress, setNewSupplierAddress] = useState("");
+  const [newSupplierGstNumber, setNewSupplierGstNumber] = useState("");
   const [reference, setReference] = useState("");
   const [gstNumber, setGstNumber] = useState("");
-  const [manufacturingDate, setManufacturingDate] = useState("");
   const [notes, setNotes] = useState("");
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [openProductLine, setOpenProductLine] = useState<number | null>(null);
   const productDropdownRef = useRef<HTMLDivElement>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     if (openProductLine === null) return;
@@ -65,6 +64,7 @@ export default function PurchasesPage() {
       ratePerLitre: string;
       unitsReceived: string;
       stockType: string;
+      manufacturingDate: string;
       unitPrice: number;
     }[]
   >([
@@ -75,32 +75,35 @@ export default function PurchasesPage() {
       ratePerLitre: "",
       unitsReceived: "",
       stockType: "",
+      manufacturingDate: "",
       unitPrice: 0,
     },
   ]);
 
   const load = () => {
-    fetch("/api/purchases").then((r) => r.json()).then((json) => setPurchases(Array.isArray(json) ? json : [])).catch(() => setPurchases([]));
-    fetch("/api/suppliers").then((r) => r.json()).then((json) => setSuppliers(Array.isArray(json) ? json : [])).catch(() => setSuppliers([]));
+    setLoadError(null);
+    Promise.all([
+      fetch("/api/purchases").then((r) => r.json().then((json) => ({ ok: r.ok, json }))),
+      fetch("/api/suppliers").then((r) => r.json().then((json) => ({ ok: r.ok, json }))),
+      fetch("/api/products").then((r) => r.json().then((json) => ({ ok: r.ok, json }))),
+    ])
+      .then(([p, s, prod]) => {
+        const err: string[] = [];
+        if (p.ok && Array.isArray(p.json)) setPurchases(p.json);
+        else err.push((p.json as { error?: string })?.error || "purchases");
+        if (s.ok && Array.isArray(s.json)) setSuppliers(s.json);
+        else err.push((s.json as { error?: string })?.error || "suppliers");
+        if (prod.ok && Array.isArray(prod.json)) setProducts(prod.json);
+        else err.push((prod.json as { error?: string })?.error || "products");
+        setLoadError(err.length ? (err.length === 1 ? err[0] : "Failed to load data. Check your connection and retry.") : null);
+      })
+      .catch(() => setLoadError("Failed to load data. Check your connection and retry."))
+      .finally(() => setLoading(false));
   };
 
   useEffect(() => {
-    Promise.all([
-      fetch("/api/purchases").then((r) => r.json()),
-      fetch("/api/suppliers").then((r) => r.json()),
-      fetch("/api/products").then((r) => r.json()),
-    ])
-      .then(([p, s, prod]) => {
-        setPurchases(Array.isArray(p) ? p : []);
-        setSuppliers(Array.isArray(s) ? s : []);
-        setProducts(Array.isArray(prod) ? prod : []);
-      })
-      .catch(() => {
-        setPurchases([]);
-        setSuppliers([]);
-        setProducts([]);
-      })
-      .finally(() => setLoading(false));
+    setLoading(true);
+    load();
   }, []);
 
   const addLine = () => {
@@ -113,6 +116,7 @@ export default function PurchasesPage() {
         ratePerLitre: "",
         unitsReceived: "",
         stockType: "",
+        manufacturingDate: "",
         unitPrice: 0,
       },
     ]);
@@ -143,6 +147,10 @@ export default function PurchasesPage() {
       alert("Enter the new supplier name");
       return;
     }
+    if (supplierId === "__new__" && !newSupplierGstNumber.trim()) {
+      alert("GST Number is required for the new supplier.");
+      return;
+    }
     const items = lines.filter(
       (l) => l.productId && (Number(l.unitsReceived) || 0) > 0
     );
@@ -160,14 +168,11 @@ export default function PurchasesPage() {
       ...(supplierId === "__new__" && newSupplierName.trim() && {
         newSupplier: {
           name: newSupplierName.trim(),
-          email: newSupplierEmail.trim() || undefined,
-          phone: newSupplierPhone.trim() || undefined,
-          address: newSupplierAddress.trim() || undefined,
+          gstNumber: newSupplierGstNumber.trim(),
         },
       }),
       reference: reference.trim() || null,
       gstNumber: gstNumber.trim() || null,
-      manufacturingDate: manufacturingDate.trim() || null,
       notes: notes.trim() || null,
       date,
       items: items.map((l) => ({
@@ -176,6 +181,7 @@ export default function PurchasesPage() {
         ratePerLitre: l.ratePerLitre.trim() ? parseFloat(l.ratePerLitre) : undefined,
         unitsReceived: Number(l.unitsReceived) || 0,
         stockType: l.stockType.trim() || undefined,
+        manufacturingDate: l.manufacturingDate.trim() || null,
         unitPrice: Number(l.unitPrice) || 0,
       })),
     };
@@ -193,12 +199,9 @@ export default function PurchasesPage() {
     }
     setSupplierId("");
     setNewSupplierName("");
-    setNewSupplierEmail("");
-    setNewSupplierPhone("");
-    setNewSupplierAddress("");
+    setNewSupplierGstNumber("");
     setReference("");
     setGstNumber("");
-    setManufacturingDate("");
     setNotes("");
     setDate(new Date().toISOString().slice(0, 10));
     setLines([
@@ -209,6 +212,7 @@ export default function PurchasesPage() {
         ratePerLitre: "",
         unitsReceived: "",
         stockType: "",
+        manufacturingDate: "",
         unitPrice: 0,
       },
     ]);
@@ -221,12 +225,9 @@ export default function PurchasesPage() {
     setEditingPurchaseId(purchase.id);
     setSupplierId(purchase.supplier.id);
     setNewSupplierName("");
-    setNewSupplierEmail("");
-    setNewSupplierPhone("");
-    setNewSupplierAddress("");
+    setNewSupplierGstNumber("");
     setReference(purchase.reference ?? "");
     setGstNumber(purchase.gstNumber ?? "");
-    setManufacturingDate(purchase.manufacturingDate ? purchase.manufacturingDate.slice(0, 10) : "");
     setNotes(purchase.notes ?? "");
     setDate(purchase.date.slice(0, 10));
     setLines(
@@ -238,6 +239,7 @@ export default function PurchasesPage() {
             ratePerLitre: it.ratePerLitre != null ? String(it.ratePerLitre) : "",
             unitsReceived: String(it.unitsReceived ?? it.quantity),
             stockType: it.stockType ?? "",
+            manufacturingDate: it.manufacturingDate ? it.manufacturingDate.slice(0, 10) : "",
             unitPrice: it.unitPrice,
           }))
         : [
@@ -248,6 +250,7 @@ export default function PurchasesPage() {
               ratePerLitre: "",
               unitsReceived: "",
               stockType: "",
+              manufacturingDate: "",
               unitPrice: 0,
             },
           ]
@@ -276,6 +279,18 @@ export default function PurchasesPage() {
 
   return (
     <div className="space-y-6">
+      {loadError && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-4 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-amber-800">{loadError}</p>
+          <button
+            type="button"
+            onClick={() => { setLoadError(null); setLoading(true); load(); }}
+            className="rounded-lg bg-amber-200 px-3 py-1.5 text-sm font-medium text-amber-900 hover:bg-amber-300"
+          >
+            Retry
+          </button>
+        </div>
+      )}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h1 className="text-2xl font-semibold text-slate-900">Purchases</h1>
         <button
@@ -303,7 +318,16 @@ export default function PurchasesPage() {
               <label className="block text-sm text-slate-600">Supplier *</label>
               <select
                 value={supplierId}
-                onChange={(e) => setSupplierId(e.target.value)}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setSupplierId(value);
+                  if (value && value !== "__new__") {
+                    const supplier = (Array.isArray(suppliers) ? suppliers : []).find((s) => s.id === value);
+                    setGstNumber(supplier?.gstNumber ?? "");
+                  } else {
+                    setGstNumber("");
+                  }
+                }}
                 className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
               >
                 <option value="">Select supplier</option>
@@ -327,31 +351,13 @@ export default function PurchasesPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm text-slate-600">Email</label>
+                  <label className="block text-sm text-slate-600">GST Number *</label>
                   <input
-                    type="email"
-                    value={newSupplierEmail}
-                    onChange={(e) => setNewSupplierEmail(e.target.value)}
+                    value={newSupplierGstNumber}
+                    onChange={(e) => setNewSupplierGstNumber(e.target.value)}
                     className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                    placeholder="Optional"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm text-slate-600">Phone</label>
-                  <input
-                    value={newSupplierPhone}
-                    onChange={(e) => setNewSupplierPhone(e.target.value)}
-                    className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                    placeholder="Optional"
-                  />
-                </div>
-                <div className="sm:col-span-2">
-                  <label className="block text-sm text-slate-600">Address</label>
-                  <input
-                    value={newSupplierAddress}
-                    onChange={(e) => setNewSupplierAddress(e.target.value)}
-                    className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                    placeholder="Optional"
+                    placeholder="e.g. 27AABCU9603R1ZM"
+                    required
                   />
                 </div>
               </div>
@@ -381,15 +387,6 @@ export default function PurchasesPage() {
                 onChange={(e) => setGstNumber(e.target.value)}
                 className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
                 placeholder="e.g. 27AABCU9603R1ZM"
-              />
-            </div>
-            <div>
-              <label className="block text-sm text-slate-600">Date of manufacturing</label>
-              <input
-                type="date"
-                value={manufacturingDate}
-                onChange={(e) => setManufacturingDate(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
               />
             </div>
             <div className="sm:col-span-2">
@@ -544,6 +541,19 @@ export default function PurchasesPage() {
                         <option value="Pail">Pail</option>
                       </select>
                     </div>
+                    <div>
+                      <label className="block text-xs text-slate-600">
+                        Date of manufacturing
+                      </label>
+                      <input
+                        type="date"
+                        value={line.manufacturingDate}
+                        onChange={(e) =>
+                          updateLine(i, "manufacturingDate", e.target.value)
+                        }
+                        className="mt-0.5 w-full rounded border border-slate-300 px-2 py-1.5 text-sm"
+                      />
+                    </div>
                     <div className="flex items-end">
                       <button
                         type="button"
@@ -569,6 +579,7 @@ export default function PurchasesPage() {
         </form>
       )}
 
+      {!showForm && (
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         <table className="min-w-full divide-y divide-slate-200">
           <thead className="bg-slate-50">
@@ -607,7 +618,13 @@ export default function PurchasesPage() {
                     {p.supplier.name}
                   </td>
                   <td className="px-4 py-3 text-sm text-slate-600">
-                    {p.reference ?? "—"}
+                    <button
+                      type="button"
+                      onClick={() => setPurchaseDetail(p)}
+                      className="text-teal-600 hover:underline text-left"
+                    >
+                      {p.reference ?? "—"}
+                    </button>
                   </td>
                   <td className="px-4 py-3 text-right text-sm font-medium text-slate-900">
                     ₹{p.total.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
@@ -636,6 +653,65 @@ export default function PurchasesPage() {
           </tbody>
         </table>
       </div>
+      )}
+
+      {purchaseDetail && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" aria-modal="true" role="dialog">
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-hidden rounded-xl bg-white shadow-xl">
+            <div className="border-b border-slate-200 bg-slate-50 px-4 py-3 flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-slate-900">Purchase details</h3>
+              <button
+                type="button"
+                onClick={() => setPurchaseDetail(null)}
+                className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              >
+                Close
+              </button>
+            </div>
+            <div className="overflow-y-auto max-h-[calc(90vh-4rem)] p-4 space-y-4">
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div>
+                  <span className="text-slate-500">Date</span>
+                  <p className="font-medium text-slate-900">{new Date(purchaseDetail.date).toLocaleDateString()}</p>
+                </div>
+                <div>
+                  <span className="text-slate-500">Invoice number</span>
+                  <p className="font-medium text-slate-900">{purchaseDetail.reference ?? "—"}</p>
+                </div>
+              </div>
+              <div>
+                <h4 className="text-xs font-medium text-slate-500 mb-2">Line items</h4>
+                <table className="min-w-full divide-y divide-slate-200 text-sm">
+                  <thead className="bg-slate-50">
+                    <tr>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-slate-500">Product name</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-slate-500">Batch number</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-slate-500">DOM</th>
+                      <th className="px-3 py-2 text-right text-xs font-medium text-slate-500">Units</th>
+                      <th className="px-3 py-2 text-right text-xs font-medium text-slate-500">Purchase price per litre</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200">
+                    {(purchaseDetail.items ?? []).map((item, idx) => (
+                      <tr key={idx}>
+                        <td className="px-3 py-2 text-slate-900">{item.product?.name ?? "—"}</td>
+                        <td className="px-3 py-2 text-slate-600">{item.batchNumber ?? "—"}</td>
+                        <td className="px-3 py-2 text-slate-600">
+                          {item.manufacturingDate ? new Date(item.manufacturingDate).toLocaleDateString() : "—"}
+                        </td>
+                        <td className="px-3 py-2 text-right text-slate-900">{item.quantity ?? item.unitsReceived ?? "—"}</td>
+                        <td className="px-3 py-2 text-right text-slate-900">
+                          {item.ratePerLitre != null ? `₹${Number(item.ratePerLitre).toLocaleString("en-IN", { minimumFractionDigits: 2 })}` : "—"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -53,9 +53,7 @@ export async function POST(request: Request) {
         const created = await prisma.customer.create({
           data: {
             name,
-            email: newCustomer.email?.trim() || null,
-            phone: newCustomer.phone?.trim() || null,
-            address: newCustomer.address?.trim() || null,
+            gstNumber: newCustomer.gstNumber?.trim() || null,
           },
         });
         resolvedCustomerId = created.id;

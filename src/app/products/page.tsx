@@ -31,6 +31,7 @@ export default function ProductsPage() {
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<{ created: number; createdNames: string[]; errors?: { row: number; message: string }[] } | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const searchLower = searchQuery.trim().toLowerCase();
   const filteredProducts =
@@ -45,11 +46,20 @@ export default function ProductsPage() {
             (p.stockType ?? "").toLowerCase().includes(searchLower)
         );
 
-  const load = () =>
-    fetch("/api/products")
-      .then((r) => r.json())
-      .then((json) => setProducts(Array.isArray(json) ? json : []))
-      .catch(() => setProducts([]));
+  const load = () => {
+    setLoadError(null);
+    return fetch("/api/products")
+      .then((r) => r.json().then((json) => ({ ok: r.ok, json })))
+      .then(({ ok, json }) => {
+        if (ok && Array.isArray(json)) {
+          setProducts(json);
+          setLoadError(null);
+        } else {
+          setLoadError((json as { error?: string })?.error || "Failed to load products");
+        }
+      })
+      .catch(() => setLoadError("Failed to load data. Check your connection and retry."));
+  };
 
   useEffect(() => {
     load().finally(() => setLoading(false));
@@ -198,6 +208,18 @@ export default function ProductsPage() {
 
   return (
     <div className="space-y-6">
+      {loadError && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-4 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-amber-800">{loadError}</p>
+          <button
+            type="button"
+            onClick={() => { setLoadError(null); setLoading(true); load().finally(() => setLoading(false)); }}
+            className="rounded-lg bg-amber-200 px-3 py-1.5 text-sm font-medium text-amber-900 hover:bg-amber-300"
+          >
+            Retry
+          </button>
+        </div>
+      )}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h1 className="text-2xl font-semibold text-slate-900">Product Master</h1>
         <div className="flex flex-wrap items-center gap-2">

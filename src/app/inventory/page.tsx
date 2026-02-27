@@ -21,13 +21,25 @@ export default function InventoryPage() {
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [productFilter, setProductFilter] = useState("");
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const load = () => {
+    setLoadError(null);
+    return fetch("/api/inventory")
+      .then((r) => r.json().then((json) => ({ ok: r.ok, json })))
+      .then(({ ok, json }) => {
+        if (ok && Array.isArray(json)) {
+          setInventory(json);
+          setLoadError(null);
+        } else {
+          setLoadError((json as { error?: string })?.error || "Failed to load inventory");
+        }
+      })
+      .catch(() => setLoadError("Failed to load data. Check your connection and retry."));
+  };
 
   useEffect(() => {
-    fetch("/api/inventory")
-      .then((r) => r.json())
-      .then((json) => setInventory(Array.isArray(json) ? json : []))
-      .catch(() => setInventory([]))
-      .finally(() => setLoading(false));
+    load().finally(() => setLoading(false));
   }, []);
 
   const filteredInventory = Array.isArray(inventory)
@@ -51,6 +63,18 @@ export default function InventoryPage() {
 
   return (
     <div className="space-y-6">
+      {loadError && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-4 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-amber-800">{loadError}</p>
+          <button
+            type="button"
+            onClick={() => { setLoadError(null); setLoading(true); load().finally(() => setLoading(false)); }}
+            className="rounded-lg bg-amber-200 px-3 py-1.5 text-sm font-medium text-amber-900 hover:bg-amber-300"
+          >
+            Retry
+          </button>
+        </div>
+      )}
       <h1 className="text-2xl font-semibold text-slate-900">Inventory</h1>
       <p className="text-sm text-slate-600">
         Current stock. Total litres updates on purchase/sale.

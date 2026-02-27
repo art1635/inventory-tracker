@@ -19,7 +19,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { name, email, phone, address } = body;
+    const { name, gstNumber } = body;
     if (!name?.trim()) {
       return NextResponse.json(
         { error: "Customer name is required" },
@@ -29,9 +29,7 @@ export async function POST(request: Request) {
     const customer = await prisma.customer.create({
       data: {
         name: name.trim(),
-        email: email?.trim() || null,
-        phone: phone?.trim() || null,
-        address: address?.trim() || null,
+        gstNumber: gstNumber?.trim() || null,
       },
     });
     return NextResponse.json(customer);

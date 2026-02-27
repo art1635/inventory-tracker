@@ -5,9 +5,7 @@ import { useEffect, useState } from "react";
 type Supplier = {
   id: string;
   name: string;
-  email: string | null;
-  phone: string | null;
-  address: string | null;
+  gstNumber: string | null;
 };
 
 export default function SuppliersPage() {
@@ -15,15 +13,23 @@ export default function SuppliersPage() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
-  const [address, setAddress] = useState("");
+  const [gstNumber, setGstNumber] = useState("");
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  const load = () =>
-    fetch("/api/suppliers")
-      .then((r) => r.json())
-      .then((json) => setSuppliers(Array.isArray(json) ? json : []))
-      .catch(() => setSuppliers([]));
+  const load = () => {
+    setLoadError(null);
+    return fetch("/api/suppliers")
+      .then((r) => r.json().then((json) => ({ ok: r.ok, json })))
+      .then(({ ok, json }) => {
+        if (ok && Array.isArray(json)) {
+          setSuppliers(json);
+          setLoadError(null);
+        } else {
+          setLoadError((json as { error?: string })?.error || "Failed to load suppliers");
+        }
+      })
+      .catch(() => setLoadError("Failed to load data. Check your connection and retry."));
+  };
 
   useEffect(() => {
     load().finally(() => setLoading(false));
@@ -31,14 +37,16 @@ export default function SuppliersPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!gstNumber.trim()) {
+      alert("GST Number is required.");
+      return;
+    }
     const res = await fetch("/api/suppliers", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         name: name.trim(),
-        email: email.trim() || null,
-        phone: phone.trim() || null,
-        address: address.trim() || null,
+        gstNumber: gstNumber.trim(),
       }),
     });
     if (!res.ok) {
@@ -47,9 +55,7 @@ export default function SuppliersPage() {
       return;
     }
     setName("");
-    setEmail("");
-    setPhone("");
-    setAddress("");
+    setGstNumber("");
     setShowForm(false);
     load();
   };
@@ -71,6 +77,18 @@ export default function SuppliersPage() {
 
   return (
     <div className="space-y-6">
+      {loadError && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-4 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-amber-800">{loadError}</p>
+          <button
+            type="button"
+            onClick={() => { setLoadError(null); setLoading(true); load().finally(() => setLoading(false)); }}
+            className="rounded-lg bg-amber-200 px-3 py-1.5 text-sm font-medium text-amber-900 hover:bg-amber-300"
+          >
+            Retry
+          </button>
+        </div>
+      )}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h1 className="text-2xl font-semibold text-slate-900">Suppliers</h1>
         <button
@@ -101,28 +119,13 @@ export default function SuppliersPage() {
               />
             </div>
             <div>
-              <label className="block text-sm text-slate-600">Email</label>
+              <label className="block text-sm text-slate-600">GST Number *</label>
               <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                value={gstNumber}
+                onChange={(e) => setGstNumber(e.target.value)}
                 className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-              />
-            </div>
-            <div>
-              <label className="block text-sm text-slate-600">Phone</label>
-              <input
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-              />
-            </div>
-            <div className="sm:col-span-2">
-              <label className="block text-sm text-slate-600">Address</label>
-              <input
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                placeholder="e.g. 27AABCU9603R1ZM"
+                required
               />
             </div>
           </div>
@@ -145,10 +148,7 @@ export default function SuppliersPage() {
                 Name
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-slate-500">
-                Email
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-slate-500">
-                Phone
+                GST Number
               </th>
               <th className="px-4 py-3 text-right text-xs font-medium text-slate-500">
                 Actions
@@ -158,7 +158,7 @@ export default function SuppliersPage() {
           <tbody className="divide-y divide-slate-200">
             {suppliers.length === 0 ? (
               <tr>
-                <td colSpan={4} className="px-4 py-8 text-center text-slate-500">
+                <td colSpan={3} className="px-4 py-8 text-center text-slate-500">
                   No suppliers yet. Add one above.
                 </td>
               </tr>
@@ -169,10 +169,7 @@ export default function SuppliersPage() {
                     {s.name}
                   </td>
                   <td className="px-4 py-3 text-sm text-slate-600">
-                    {s.email ?? "—"}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-slate-600">
-                    {s.phone ?? "—"}
+                    {s.gstNumber ?? "—"}
                   </td>
                   <td className="px-4 py-3 text-right">
                     <button

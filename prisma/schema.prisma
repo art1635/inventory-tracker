@@ -30,9 +30,7 @@ model Product {
 model Supplier {
   id        String   @id @default(cuid())
   name      String
-  email     String?
-  phone     String?
-  address   String?
+  gstNumber String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -40,32 +38,32 @@ model Supplier {
 }
 
 model Purchase {
-  id                  String    @id @default(cuid())
-  supplierId          String
-  date                DateTime  @default(now())
-  reference           String?   // Invoice number
-  gstNumber           String?
-  manufacturingDate   DateTime?
-  total               Float     @default(0)
-  notes               String?
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
+  id         String   @id @default(cuid())
+  supplierId String
+  date       DateTime @default(now())
+  reference  String?  // Invoice number
+  gstNumber  String?
+  total      Float    @default(0)
+  notes      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   supplier Supplier     @relation(fields: [supplierId], references: [id])
   items    PurchaseItem[]
 }
 
 model PurchaseItem {
-  id             String   @id @default(cuid())
-  purchaseId     String
-  productId      String
-  quantity       Int     // used for inventory (same as unitsReceived)
-  unitPrice      Float
-  total          Float
-  batchNumber    String?
-  ratePerLitre   Float?
-  unitsReceived  Int?
-  stockType      String? // Drum | Pail
+  id                String    @id @default(cuid())
+  purchaseId        String
+  productId         String
+  quantity          Int       // used for inventory (same as unitsReceived)
+  unitPrice         Float
+  total             Float
+  batchNumber       String?
+  ratePerLitre      Float?
+  unitsReceived     Int?
+  stockType         String?   // Drum | Pail
+  manufacturingDate DateTime?
 
   purchase Purchase @relation(fields: [purchaseId], references: [id])
   product  Product  @relation(fields: [productId], references: [id])
@@ -74,9 +72,7 @@ model PurchaseItem {
 model Customer {
   id        String   @id @default(cuid())
   name      String
-  email     String?
-  phone     String?
-  address   String?
+  gstNumber String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
