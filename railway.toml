@@ -1,0 +1,6 @@
+# Run DB migrations before starting the app so production schema stays in sync.
+[build]
+buildCommand = "npm run build"
+
+[deploy]
+startCommand = "npm run start:prod"
