@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { findInventoryByProductAndBatch } from "@/lib/inventory";
 
 export async function GET(
   _request: Request,
@@ -49,19 +50,27 @@ export async function DELETE(
 
     await prisma.$transaction(async (tx) => {
       for (const item of purchase.items) {
-        const inv = await tx.inventory.findUnique({
-          where: { productId: item.productId },
-        });
-        const litresPerUnit = item.product?.litres ?? 0;
-        const litresToSubtract = item.quantity * litresPerUnit;
-        if (inv) {
-          await tx.inventory.update({
-            where: { productId: item.productId },
-            data: {
-              quantity: Math.max(0, inv.quantity - item.quantity),
-              litres: Math.max(0, inv.litres - litresToSubtract),
-            },
-          });
+        if (!item.productId) continue;
+        const batchNum = (item.batchNumber ?? "").trim();
+        try {
+          const inv = await findInventoryByProductAndBatch(tx, item.productId, batchNum);
+          const litresPerUnit = item.product?.litres ?? 0;
+          const litresToSubtract = item.quantity * litresPerUnit;
+          if (inv) {
+            const newQty = Math.max(0, inv.quantity - item.quantity);
+            const newLitres = Math.max(0, inv.litres - litresToSubtract);
+            if (newQty === 0) {
+              await tx.inventory.delete({ where: { id: inv.id } });
+            } else {
+              await tx.inventory.update({
+                where: { id: inv.id },
+                data: { quantity: newQty, litres: newLitres },
+              });
+            }
+          }
+        } catch (inner) {
+          console.error("Inventory rollback for purchase item:", inner);
+          throw inner;
         }
       }
       await tx.purchaseItem.deleteMany({ where: { purchaseId: id } });
@@ -70,9 +79,10 @@ export async function DELETE(
 
     return NextResponse.json({ success: true });
   } catch (e) {
-    console.error(e);
+    console.error("Delete purchase error:", e);
+    const message = e instanceof Error ? e.message : "Failed to delete purchase";
     return NextResponse.json(
-      { error: "Failed to delete purchase" },
+      { error: message },
       { status: 500 }
     );
   }
@@ -103,10 +113,22 @@ export async function PATCH(
         { status: 400 }
       );
     }
+    if (!reference?.trim()) {
+      return NextResponse.json(
+        { error: "Invoice number is required" },
+        { status: 400 }
+      );
+    }
     for (const item of items) {
       if (!item.batchNumber?.trim()) {
         return NextResponse.json(
           { error: "Batch number is required for every line item" },
+          { status: 400 }
+        );
+      }
+      if (!item.manufacturingDate?.trim()) {
+        return NextResponse.json(
+          { error: "Date of manufacturing is required for every line item" },
           { status: 400 }
         );
       }
@@ -163,26 +185,28 @@ export async function PATCH(
           ratePerLitre: item.ratePerLitre != null ? Number(item.ratePerLitre) : null,
           unitsReceived: units,
           stockType: item.stockType?.trim() || null,
-          manufacturingDate: item.manufacturingDate ? new Date(item.manufacturingDate) : null,
+          manufacturingDate: new Date(item.manufacturingDate!),
         };
       }
     );
 
     const updated = await prisma.$transaction(async (tx) => {
       for (const item of purchase.items) {
-        const inv = await tx.inventory.findUnique({
-          where: { productId: item.productId },
-        });
+        const batchNum = (item.batchNumber || "").trim();
+        const inv = await findInventoryByProductAndBatch(tx, item.productId, batchNum);
         const litresPerUnit = item.product?.litres ?? 0;
         const litresToSubtract = item.quantity * litresPerUnit;
         if (inv) {
-          await tx.inventory.update({
-            where: { productId: item.productId },
-            data: {
-              quantity: Math.max(0, inv.quantity - item.quantity),
-              litres: Math.max(0, inv.litres - litresToSubtract),
-            },
-          });
+          const newQty = Math.max(0, inv.quantity - item.quantity);
+          const newLitres = Math.max(0, inv.litres - litresToSubtract);
+          if (newQty === 0) {
+            await tx.inventory.delete({ where: { id: inv.id } });
+          } else {
+            await tx.inventory.update({
+              where: { id: inv.id },
+              data: { quantity: newQty, litres: newLitres },
+            });
+          }
         }
       }
 
@@ -191,7 +215,7 @@ export async function PATCH(
         where: { id },
         data: {
           supplierId: resolvedSupplierId,
-          reference: reference?.trim() || null,
+          reference: reference.trim(),
           ...(gstNumber !== undefined && { gstNumber: gstNumber?.trim() || null }),
           notes: notes?.trim() || null,
           total: 0,
@@ -234,12 +258,11 @@ export async function PATCH(
           },
         });
         const litresToAdd = raw.quantity * litresPerUnit;
-        const inv = await tx.inventory.findUnique({
-          where: { productId: raw.productId },
-        });
+        const batchNum = raw.batchNumber.trim() || "";
+        const inv = await findInventoryByProductAndBatch(tx, raw.productId, batchNum);
         if (inv) {
           await tx.inventory.update({
-            where: { productId: raw.productId },
+            where: { id: inv.id },
             data: {
               quantity: inv.quantity + raw.quantity,
               litres: inv.litres + litresToAdd,
@@ -249,6 +272,7 @@ export async function PATCH(
           await tx.inventory.create({
             data: {
               productId: raw.productId,
+              batchNumber: batchNum,
               quantity: raw.quantity,
               litres: litresToAdd,
             },

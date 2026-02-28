@@ -143,9 +143,6 @@ export async function POST(request: Request) {
             gstPerc: gstPerc != null ? gstPerc : null,
           },
         });
-        await prisma.inventory.create({
-          data: { productId: product.id, quantity: 0 },
-        });
         created.push(product.name);
       } catch (e) {
         const msg = e instanceof Error ? e.message : "Failed to create product";

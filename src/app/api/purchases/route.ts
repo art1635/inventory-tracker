@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { findInventoryByProductAndBatch } from "@/lib/inventory";
 
 export async function GET() {
   try {
@@ -32,10 +33,22 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
+    if (!reference?.trim()) {
+      return NextResponse.json(
+        { error: "Invoice number is required" },
+        { status: 400 }
+      );
+    }
     for (const item of items) {
       if (!item.batchNumber?.trim()) {
         return NextResponse.json(
           { error: "Batch number is required for every line item" },
+          { status: 400 }
+        );
+      }
+      if (!item.manufacturingDate?.trim()) {
+        return NextResponse.json(
+          { error: "Date of manufacturing is required for every line item" },
           { status: 400 }
         );
       }
@@ -93,7 +106,7 @@ export async function POST(request: Request) {
           ratePerLitre: item.ratePerLitre != null ? Number(item.ratePerLitre) : null,
           unitsReceived: units,
           stockType: item.stockType?.trim() || null,
-          manufacturingDate: item.manufacturingDate ? new Date(item.manufacturingDate) : null,
+          manufacturingDate: new Date(item.manufacturingDate!),
         };
       }
     );
@@ -103,7 +116,7 @@ export async function POST(request: Request) {
       const p = await tx.purchase.create({
         data: {
           supplierId: resolvedSupplierId,
-          reference: reference?.trim() || null,
+          reference: reference.trim(),
           gstNumber: gstNumber?.trim() || null,
           notes: notes?.trim() || null,
           total: 0,
@@ -144,12 +157,11 @@ export async function POST(request: Request) {
           },
         });
         const litresToAdd = raw.quantity * litresPerUnit;
-        const inv = await tx.inventory.findUnique({
-          where: { productId: raw.productId },
-        });
+        const batch = raw.batchNumber.trim() || "";
+        const inv = await findInventoryByProductAndBatch(tx, raw.productId, batch);
         if (inv) {
           await tx.inventory.update({
-            where: { productId: raw.productId },
+            where: { id: inv.id },
             data: {
               quantity: inv.quantity + raw.quantity,
               litres: inv.litres + litresToAdd,
@@ -159,6 +171,7 @@ export async function POST(request: Request) {
           await tx.inventory.create({
             data: {
               productId: raw.productId,
+              batchNumber: batch,
               quantity: raw.quantity,
               litres: litresToAdd,
             },

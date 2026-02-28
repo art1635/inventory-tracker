@@ -22,6 +22,7 @@ export default function InventoryPage() {
   const [loading, setLoading] = useState(true);
   const [productFilter, setProductFilter] = useState("");
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [syncingAll, setSyncingAll] = useState(false);
 
   const load = () => {
     setLoadError(null);
@@ -97,6 +98,31 @@ export default function InventoryPage() {
             {filteredInventory.length} of {inventory.length} item{inventory.length !== 1 ? "s" : ""}
           </span>
         )}
+        <button
+          type="button"
+          onClick={async () => {
+            if (syncingAll) return;
+            setSyncingAll(true);
+            setLoadError(null);
+            try {
+              const r = await fetch("/api/inventory/sync-all-purchases", { method: "POST" });
+              const json = await r.json();
+              if (r.ok) {
+                await load();
+              } else {
+                setLoadError((json as { error?: string }).error ?? "Failed to sync");
+              }
+            } catch {
+              setLoadError("Failed to sync. Check your connection.");
+            } finally {
+              setSyncingAll(false);
+            }
+          }}
+          disabled={syncingAll}
+          className="rounded-lg bg-teal-600 px-3 py-2 text-sm font-medium text-white hover:bg-teal-700 disabled:opacity-50"
+        >
+          {syncingAll ? "Syncing…" : "Sync all purchases to inventory"}
+        </button>
       </div>
 
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-md">

@@ -22,7 +22,7 @@ model Product {
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 
-  inventory     Inventory?
+  inventory     Inventory[]
   purchaseItems PurchaseItem[]
   saleItems     SaleItem[]
 }
@@ -109,11 +109,13 @@ model SaleItem {
 }
 
 model Inventory {
-  id        String   @id @default(cuid())
-  productId String   @unique
-  quantity  Int      @default(0)
-  litres    Float    @default(0) // total litres in stock (deducted on sale)
-  updatedAt DateTime @updatedAt
+  id          String   @id @default(cuid())
+  productId   String
+  batchNumber String   // unique per product + batch
+  quantity    Int      @default(0)
+  litres      Float    @default(0) // total litres in stock (deducted on sale)
+  updatedAt   DateTime @updatedAt
 
   product Product @relation(fields: [productId], references: [id])
+  @@unique([productId, batchNumber])
 }

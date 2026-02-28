@@ -1,21 +1,19 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 
+/** Returns only batches that have stock in inventory (quantity > 0). */
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id: productId } = await params;
-    const items = await prisma.purchaseItem.findMany({
-      where: { productId, batchNumber: { not: null } },
+    const rows = await prisma.inventory.findMany({
+      where: { productId, quantity: { gt: 0 } },
       select: { batchNumber: true },
-      distinct: ["batchNumber"],
       orderBy: { batchNumber: "asc" },
     });
-    const batches = items
-      .map((i) => i.batchNumber)
-      .filter((b): b is string => b != null && b.trim() !== "");
+    const batches = rows.map((r) => r.batchNumber).filter((b) => b != null && b.trim() !== "");
     return NextResponse.json({ batches });
   } catch (e) {
     console.error(e);

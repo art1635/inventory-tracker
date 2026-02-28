@@ -12,6 +12,7 @@ export default function SuppliersPage() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [editingSupplierId, setEditingSupplierId] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [gstNumber, setGstNumber] = useState("");
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -37,12 +38,20 @@ export default function SuppliersPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!name.trim()) {
+      alert("Name is required.");
+      return;
+    }
     if (!gstNumber.trim()) {
       alert("GST Number is required.");
       return;
     }
-    const res = await fetch("/api/suppliers", {
-      method: "POST",
+    const url = editingSupplierId
+      ? `/api/suppliers/${editingSupplierId}`
+      : "/api/suppliers";
+    const method = editingSupplierId ? "PATCH" : "POST";
+    const res = await fetch(url, {
+      method,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         name: name.trim(),
@@ -51,13 +60,21 @@ export default function SuppliersPage() {
     });
     if (!res.ok) {
       const err = await res.json();
-      alert(err.error || "Failed to create supplier");
+      alert(err.error || (editingSupplierId ? "Failed to update supplier" : "Failed to create supplier"));
       return;
     }
     setName("");
     setGstNumber("");
     setShowForm(false);
+    setEditingSupplierId(null);
     load();
+  };
+
+  const handleEdit = (s: Supplier) => {
+    setEditingSupplierId(s.id);
+    setName(s.name);
+    setGstNumber(s.gstNumber ?? "");
+    setShowForm(true);
   };
 
   const handleDelete = async (id: string) => {
@@ -93,7 +110,10 @@ export default function SuppliersPage() {
         <h1 className="text-3xl font-bold tracking-tight text-slate-800">Suppliers</h1>
         <button
           type="button"
-          onClick={() => setShowForm(!showForm)}
+          onClick={() => {
+            setShowForm(!showForm);
+            if (showForm) setEditingSupplierId(null);
+          }}
           className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white shadow-md hover:bg-teal-700 hover:shadow-lg transition-all"
         >
           {showForm ? "Cancel" : "Add supplier"}
@@ -106,7 +126,7 @@ export default function SuppliersPage() {
           className="rounded-xl border border-slate-200 bg-white p-6 shadow-md"
         >
           <h2 className="mb-4 text-sm font-medium text-slate-700">
-            New supplier
+            {editingSupplierId ? "Edit supplier" : "New supplier"}
           </h2>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
@@ -134,7 +154,7 @@ export default function SuppliersPage() {
               type="submit"
               className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white shadow-md hover:bg-teal-700 hover:shadow-lg transition-all"
             >
-              Save supplier
+              {editingSupplierId ? "Update supplier" : "Save supplier"}
             </button>
           </div>
         </form>
@@ -171,7 +191,14 @@ export default function SuppliersPage() {
                   <td className="px-4 py-3 text-sm text-slate-600">
                     {s.gstNumber ?? "—"}
                   </td>
-                  <td className="px-4 py-3 text-right">
+                  <td className="px-4 py-3 text-right space-x-3">
+                    <button
+                      type="button"
+                      onClick={() => handleEdit(s)}
+                      className="text-sm text-teal-600 hover:underline"
+                    >
+                      Edit
+                    </button>
                     <button
                       type="button"
                       onClick={() => handleDelete(s.id)}

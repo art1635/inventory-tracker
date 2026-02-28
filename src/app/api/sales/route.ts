@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { findInventoryByProductAndBatch } from "@/lib/inventory";
 
 export async function GET() {
   try {
@@ -32,10 +33,29 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
+    if (!reference?.trim()) {
+      return NextResponse.json(
+        { error: "Invoice number is required" },
+        { status: 400 }
+      );
+    }
     for (const item of items) {
       if (!item.batchNumber?.trim()) {
         return NextResponse.json(
           { error: "Batch is required for every line item" },
+          { status: 400 }
+        );
+      }
+      if (!item.stockType?.trim()) {
+        return NextResponse.json(
+          { error: "Stock type is required for every line item" },
+          { status: 400 }
+        );
+      }
+      const up = Number(item.unitPrice);
+      if (Number.isNaN(up) || up < 0) {
+        return NextResponse.json(
+          { error: "Sale price per litre is required for every line item (0 or more)" },
           { status: 400 }
         );
       }
@@ -93,17 +113,17 @@ export async function POST(request: Request) {
         unitPrice: price,
         total: lineTotal,
         batchNumber: item.batchNumber.trim(),
-        stockType: item.stockType?.trim() || null,
+        stockType: item.stockType.trim(),
       });
     }
     const gst = Number(gstPerc) || 0;
     const total = subtotal * (1 + gst / 100);
 
     const sale = await prisma.$transaction(async (tx) => {
+      const batch = (bn: string) => (bn || "").trim();
       for (const line of lineItems) {
-        const inv = await tx.inventory.findUnique({
-          where: { productId: line.productId },
-        });
+        const batchNum = batch(line.batchNumber);
+        const inv = await findInventoryByProductAndBatch(tx, line.productId, batchNum);
         const product = await tx.product.findUnique({
           where: { id: line.productId },
         });
@@ -113,12 +133,12 @@ export async function POST(request: Request) {
         const litresToDeduct = line.quantity * litresPerUnit;
         if (currentQty < line.quantity) {
           throw new Error(
-            `Insufficient stock for "${product?.name ?? line.productId}". Available: ${currentQty} units, requested: ${line.quantity}`
+            `Insufficient stock for "${product?.name ?? line.productId}" (batch ${batchNum || "—"}). Available: ${currentQty} units, requested: ${line.quantity}`
           );
         }
         if (litresPerUnit > 0 && currentLitres < litresToDeduct) {
           throw new Error(
-            `Insufficient litres for "${product?.name ?? line.productId}". Available: ${currentLitres.toFixed(2)} L, requested: ${litresToDeduct.toFixed(2)} L (${line.quantity} × ${litresPerUnit} L)`
+            `Insufficient litres for "${product?.name ?? line.productId}" (batch ${batchNum || "—"}). Available: ${currentLitres.toFixed(2)} L, requested: ${litresToDeduct.toFixed(2)} L`
           );
         }
       }
@@ -126,7 +146,7 @@ export async function POST(request: Request) {
       const s = await tx.sale.create({
         data: {
           customerId: resolvedCustomerId,
-          reference: reference?.trim() || null,
+          reference: reference.trim(),
           notes: notes?.trim() || null,
           total,
           gstPerc: gst > 0 ? gst : null,
@@ -145,22 +165,24 @@ export async function POST(request: Request) {
             stockType: line.stockType,
           },
         });
+        const batchNum = batch(line.batchNumber);
         const product = await tx.product.findUnique({
           where: { id: line.productId },
         });
         const litresPerUnit = product?.litres ?? 0;
         const litresToDeduct = line.quantity * litresPerUnit;
-        const inv = await tx.inventory.findUnique({
-          where: { productId: line.productId },
-        });
+        const inv = await findInventoryByProductAndBatch(tx, line.productId, batchNum);
         if (inv) {
-          await tx.inventory.update({
-            where: { productId: line.productId },
-            data: {
-              quantity: inv.quantity - line.quantity,
-              litres: Math.max(0, inv.litres - litresToDeduct),
-            },
-          });
+          const newQty = inv.quantity - line.quantity;
+          const newLitres = Math.max(0, inv.litres - litresToDeduct);
+          if (newQty <= 0) {
+            await tx.inventory.delete({ where: { id: inv.id } });
+          } else {
+            await tx.inventory.update({
+              where: { id: inv.id },
+              data: { quantity: newQty, litres: newLitres },
+            });
+          }
         }
       }
       return tx.sale.findUnique({

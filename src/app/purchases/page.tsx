@@ -44,6 +44,8 @@ export default function PurchasesPage() {
   const [openProductLine, setOpenProductLine] = useState<number | null>(null);
   const productDropdownRef = useRef<HTMLDivElement>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [syncingInventory, setSyncingInventory] = useState(false);
+  const [syncInventoryMessage, setSyncInventoryMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   useEffect(() => {
     if (openProductLine === null) return;
@@ -143,6 +145,10 @@ export default function PurchasesPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!reference.trim()) {
+      alert("Invoice number is required.");
+      return;
+    }
     if (supplierId === "__new__" && !newSupplierName.trim()) {
       alert("Enter the new supplier name");
       return;
@@ -163,6 +169,11 @@ export default function PurchasesPage() {
       alert("Batch number is required for every line item.");
       return;
     }
+    const missingDom = items.some((l) => !l.manufacturingDate?.trim());
+    if (missingDom) {
+      alert("Date of manufacturing is required for every line item.");
+      return;
+    }
     const body = {
       supplierId: supplierId === "__new__" ? undefined : supplierId,
       ...(supplierId === "__new__" && newSupplierName.trim() && {
@@ -171,7 +182,7 @@ export default function PurchasesPage() {
           gstNumber: newSupplierGstNumber.trim(),
         },
       }),
-      reference: reference.trim() || null,
+      reference: reference.trim(),
       gstNumber: gstNumber.trim() || null,
       notes: notes.trim() || null,
       date,
@@ -181,7 +192,7 @@ export default function PurchasesPage() {
         ratePerLitre: l.ratePerLitre.trim() ? parseFloat(l.ratePerLitre) : undefined,
         unitsReceived: Number(l.unitsReceived) || 0,
         stockType: l.stockType.trim() || undefined,
-        manufacturingDate: l.manufacturingDate.trim() || null,
+        manufacturingDate: l.manufacturingDate.trim(),
         unitPrice: Number(l.unitPrice) || 0,
       })),
     };
@@ -372,7 +383,7 @@ export default function PurchasesPage() {
               />
             </div>
             <div>
-              <label className="block text-sm text-slate-600">Invoice number</label>
+              <label className="block text-sm text-slate-600">Invoice number *</label>
               <input
                 value={reference}
                 onChange={(e) => setReference(e.target.value)}
@@ -543,7 +554,7 @@ export default function PurchasesPage() {
                     </div>
                     <div>
                       <label className="block text-xs text-slate-600">
-                        Date of manufacturing
+                        Date of manufacturing *
                       </label>
                       <input
                         type="date"
@@ -658,17 +669,53 @@ export default function PurchasesPage() {
       {purchaseDetail && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" aria-modal="true" role="dialog">
           <div className="max-h-[90vh] w-full max-w-2xl overflow-hidden rounded-xl bg-white shadow-xl">
-            <div className="border-b border-slate-200 bg-slate-50 px-4 py-3 flex items-center justify-between">
+            <div className="border-b border-slate-200 bg-slate-50 px-4 py-3 flex items-center justify-between gap-2 flex-wrap">
               <h3 className="text-sm font-semibold text-slate-900">Purchase details</h3>
-              <button
-                type="button"
-                onClick={() => setPurchaseDetail(null)}
-                className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
-              >
-                Close
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (!purchaseDetail?.id || syncingInventory) return;
+                    setSyncingInventory(true);
+                    setSyncInventoryMessage(null);
+                    try {
+                      const r = await fetch(`/api/purchases/${purchaseDetail.id}/sync-inventory`, { method: "POST" });
+                      const json = await r.json();
+                      if (r.ok) {
+                        setSyncInventoryMessage({ type: "success", text: "Synced to inventory. Check the Inventory page." });
+                      } else {
+                        setSyncInventoryMessage({ type: "error", text: (json as { error?: string }).error ?? "Failed to sync" });
+                      }
+                    } catch {
+                      setSyncInventoryMessage({ type: "error", text: "Failed to sync. Check your connection." });
+                    } finally {
+                      setSyncingInventory(false);
+                    }
+                  }}
+                  disabled={syncingInventory}
+                  title="Only needed if this purchase’s products are missing from Inventory (e.g. old data)"
+                  className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+                >
+                  {syncingInventory ? "Syncing…" : "Fix missing inventory"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setPurchaseDetail(null); setSyncInventoryMessage(null); }}
+                  className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  Close
+                </button>
+              </div>
             </div>
             <div className="overflow-y-auto max-h-[calc(90vh-4rem)] p-4 space-y-4">
+              <p className="text-xs text-slate-500">
+                Inventory is updated automatically when you create or edit a purchase (product, batch, quantity, litres). Use &quot;Fix missing inventory&quot; only if this purchase’s products don’t appear in Inventory.
+              </p>
+              {syncInventoryMessage && (
+                <div className={`rounded-lg border p-3 text-sm ${syncInventoryMessage.type === "success" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-red-200 bg-red-50 text-red-800"}`}>
+                  {syncInventoryMessage.text}
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-2 text-sm">
                 <div>
                   <span className="text-slate-500">Date</span>

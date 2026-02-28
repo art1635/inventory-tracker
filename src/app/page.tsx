@@ -11,7 +11,7 @@ type Dashboard = {
   sales: number;
   purchaseTotal: number;
   saleTotal: number;
-  lowStock: { quantity: number; product: { name: string; id: string } }[];
+  lowStock: { quantity: number; batchNumber?: string | null; product: { name: string; id: string } }[];
 };
 
 const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -185,12 +185,13 @@ export default function DashboardPage() {
           </h2>
           <ul className="mt-3 space-y-2">
             {lowStockList.map((item) => (
-              <li key={item?.product?.id ?? item?.product?.name ?? Math.random()} className="flex justify-between rounded-lg bg-white/60 px-3 py-2 text-sm">
+              <li key={`${item?.product?.id ?? ""}-${item?.batchNumber ?? ""}-${item?.quantity ?? 0}`} className="flex justify-between rounded-lg bg-white/60 px-3 py-2 text-sm">
                 <Link
                   href="/inventory"
                   className="font-medium text-amber-900 hover:underline"
                 >
                   {item?.product?.name ?? "—"}
+                  {item?.batchNumber ? ` (batch ${item.batchNumber})` : ""}
                 </Link>
                 <span className="font-semibold text-amber-700">{item?.quantity ?? 0} left</span>
               </li>

@@ -44,7 +44,7 @@ export async function GET(request: Request) {
         prisma.inventory
           .findMany({
             include: { product: true },
-            where: { quantity: { lte: 10 } },
+            where: { quantity: { gt: 0, lte: 10 } },
             orderBy: { quantity: "asc" },
           })
           .catch(() => []),

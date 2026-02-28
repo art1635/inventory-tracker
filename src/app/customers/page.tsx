@@ -12,6 +12,7 @@ export default function CustomersPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [editingCustomerId, setEditingCustomerId] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [gstNumber, setGstNumber] = useState("");
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -37,8 +38,16 @@ export default function CustomersPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const res = await fetch("/api/customers", {
-      method: "POST",
+    if (!name.trim()) {
+      alert("Name is required.");
+      return;
+    }
+    const url = editingCustomerId
+      ? `/api/customers/${editingCustomerId}`
+      : "/api/customers";
+    const method = editingCustomerId ? "PATCH" : "POST";
+    const res = await fetch(url, {
+      method,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         name: name.trim(),
@@ -47,13 +56,21 @@ export default function CustomersPage() {
     });
     if (!res.ok) {
       const err = await res.json();
-      alert(err.error || "Failed to create customer");
+      alert(err.error || (editingCustomerId ? "Failed to update customer" : "Failed to create customer"));
       return;
     }
     setName("");
     setGstNumber("");
     setShowForm(false);
+    setEditingCustomerId(null);
     load();
+  };
+
+  const handleEdit = (c: Customer) => {
+    setEditingCustomerId(c.id);
+    setName(c.name);
+    setGstNumber(c.gstNumber ?? "");
+    setShowForm(true);
   };
 
   const handleDelete = async (id: string) => {
@@ -89,7 +106,10 @@ export default function CustomersPage() {
         <h1 className="text-3xl font-bold tracking-tight text-slate-800">Customers</h1>
         <button
           type="button"
-          onClick={() => setShowForm(!showForm)}
+          onClick={() => {
+            setShowForm(!showForm);
+            if (showForm) setEditingCustomerId(null);
+          }}
           className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white shadow-md hover:bg-teal-700 hover:shadow-lg transition-all"
         >
           {showForm ? "Cancel" : "Add customer"}
@@ -102,7 +122,7 @@ export default function CustomersPage() {
           className="rounded-xl border border-slate-200 bg-white p-6 shadow-md"
         >
           <h2 className="mb-4 text-sm font-medium text-slate-700">
-            New customer
+            {editingCustomerId ? "Edit customer" : "New customer"}
           </h2>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
@@ -129,7 +149,7 @@ export default function CustomersPage() {
               type="submit"
               className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white shadow-md hover:bg-teal-700 hover:shadow-lg transition-all"
             >
-              Save customer
+              {editingCustomerId ? "Update customer" : "Save customer"}
             </button>
           </div>
         </form>
@@ -166,7 +186,14 @@ export default function CustomersPage() {
                   <td className="px-4 py-3 text-sm text-slate-600">
                     {c.gstNumber ?? "—"}
                   </td>
-                  <td className="px-4 py-3 text-right">
+                  <td className="px-4 py-3 text-right space-x-3">
+                    <button
+                      type="button"
+                      onClick={() => handleEdit(c)}
+                      className="text-sm text-teal-600 hover:underline"
+                    >
+                      Edit
+                    </button>
                     <button
                       type="button"
                       onClick={() => handleDelete(c.id)}

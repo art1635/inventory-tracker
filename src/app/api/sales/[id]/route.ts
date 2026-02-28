@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { findInventoryByProductAndBatch } from "@/lib/inventory";
 
 export async function GET(
   _request: Request,
@@ -42,18 +43,27 @@ export async function DELETE(
     }
 
     await prisma.$transaction(async (tx) => {
+      const batch = (bn: string | null) => (bn || "").trim();
       for (const item of sale.items) {
-        const inv = await tx.inventory.findUnique({
-          where: { productId: item.productId },
-        });
+        const batchNum = batch(item.batchNumber);
+        const inv = await findInventoryByProductAndBatch(tx, item.productId, batchNum);
         const litresPerUnit = item.product?.litres ?? 0;
         const litresToAdd = item.quantity * litresPerUnit;
         if (inv) {
           await tx.inventory.update({
-            where: { productId: item.productId },
+            where: { id: inv.id },
             data: {
               quantity: inv.quantity + item.quantity,
               litres: inv.litres + litresToAdd,
+            },
+          });
+        } else {
+          await tx.inventory.create({
+            data: {
+              productId: item.productId,
+              batchNumber: batchNum,
+              quantity: item.quantity,
+              litres: litresToAdd,
             },
           });
         }
@@ -94,10 +104,29 @@ export async function PATCH(
         { status: 400 }
       );
     }
+    if (!reference?.trim()) {
+      return NextResponse.json(
+        { error: "Invoice number is required" },
+        { status: 400 }
+      );
+    }
     for (const item of items) {
       if (!item.batchNumber?.trim()) {
         return NextResponse.json(
           { error: "Batch is required for every line item" },
+          { status: 400 }
+        );
+      }
+      if (!item.stockType?.trim()) {
+        return NextResponse.json(
+          { error: "Stock type is required for every line item" },
+          { status: 400 }
+        );
+      }
+      const up = Number(item.unitPrice);
+      if (Number.isNaN(up) || up < 0) {
+        return NextResponse.json(
+          { error: "Sale price per litre is required for every line item (0 or more)" },
           { status: 400 }
         );
       }
@@ -154,72 +183,58 @@ export async function PATCH(
         unitPrice: price,
         total: lineTotal,
         batchNumber: item.batchNumber.trim(),
-        stockType: item.stockType?.trim() || null,
+        stockType: item.stockType.trim(),
       });
     }
     const gst = Number(gstPerc) || 0;
     const total = subtotal * (1 + gst / 100);
 
     const updated = await prisma.$transaction(async (tx) => {
-      // Restore inventory from the existing sale first (so we don't fail when qty unchanged)
-      const restoreByProduct = new Map<
-        string,
-        { quantity: number; litres: number }
-      >();
+      // Restore inventory from the existing sale first (per product+batch)
+      const batch = (bn: string | null) => (bn || "").trim();
       for (const item of sale.items) {
+        const batchNum = batch(item.batchNumber);
         const litresPerUnit = item.product?.litres ?? 0;
         const litresToAdd = item.quantity * litresPerUnit;
-        const cur = restoreByProduct.get(item.productId) ?? {
-          quantity: 0,
-          litres: 0,
-        };
-        restoreByProduct.set(item.productId, {
-          quantity: cur.quantity + item.quantity,
-          litres: cur.litres + litresToAdd,
-        });
-      }
-      for (const [productId, { quantity: addQty, litres: addLitres }] of restoreByProduct) {
-        const inv = await tx.inventory.findUnique({
-          where: { productId },
-        });
+        const inv = await findInventoryByProductAndBatch(tx, item.productId, batchNum);
         if (inv) {
           await tx.inventory.update({
-            where: { productId },
+            where: { id: inv.id },
             data: {
-              quantity: inv.quantity + addQty,
-              litres: inv.litres + addLitres,
+              quantity: inv.quantity + item.quantity,
+              litres: inv.litres + litresToAdd,
             },
           });
         } else {
           await tx.inventory.create({
             data: {
-              productId,
-              quantity: addQty,
-              litres: addLitres,
+              productId: item.productId,
+              batchNumber: batchNum,
+              quantity: item.quantity,
+              litres: litresToAdd,
             },
           });
         }
       }
 
       for (const line of lineItems) {
+        const batchNum = batch(line.batchNumber);
         const product = await tx.product.findUnique({
           where: { id: line.productId },
         });
-        const inv = await tx.inventory.findUnique({
-          where: { productId: line.productId },
-        });
+        const inv = await findInventoryByProductAndBatch(tx, line.productId, batchNum);
         const currentQty = inv?.quantity ?? 0;
         const currentLitres = inv?.litres ?? 0;
         const litresPerUnit = product?.litres ?? 0;
         const litresToDeduct = line.quantity * litresPerUnit;
         if (currentQty < line.quantity) {
           throw new Error(
-            `Insufficient stock for "${product?.name ?? line.productId}". Available: ${currentQty} units, requested: ${line.quantity}`
+            `Insufficient stock for "${product?.name ?? line.productId}" (batch ${batchNum || "—"}). Available: ${currentQty} units, requested: ${line.quantity}`
           );
         }
         if (litresPerUnit > 0 && currentLitres < litresToDeduct) {
           throw new Error(
-            `Insufficient litres for "${product?.name ?? line.productId}". Available: ${currentLitres.toFixed(2)} L, requested: ${litresToDeduct.toFixed(2)} L`
+            `Insufficient litres for "${product?.name ?? line.productId}" (batch ${batchNum || "—"}). Available: ${currentLitres.toFixed(2)} L, requested: ${litresToDeduct.toFixed(2)} L`
           );
         }
       }
@@ -229,7 +244,7 @@ export async function PATCH(
         where: { id },
         data: {
           customerId: resolvedCustomerId,
-          reference: reference?.trim() || null,
+          reference: reference.trim(),
           notes: notes?.trim() || null,
           total,
           gstPerc: gst > 0 ? gst : null,
@@ -249,22 +264,24 @@ export async function PATCH(
             stockType: line.stockType,
           },
         });
+        const batchNum = batch(line.batchNumber);
         const product = await tx.product.findUnique({
           where: { id: line.productId },
         });
         const litresPerUnit = product?.litres ?? 0;
         const litresToDeduct = line.quantity * litresPerUnit;
-        const inv = await tx.inventory.findUnique({
-          where: { productId: line.productId },
-        });
+        const inv = await findInventoryByProductAndBatch(tx, line.productId, batchNum);
         if (inv) {
-          await tx.inventory.update({
-            where: { productId: line.productId },
-            data: {
-              quantity: inv.quantity - line.quantity,
-              litres: Math.max(0, inv.litres - litresToDeduct),
-            },
-          });
+          const newQty = inv.quantity - line.quantity;
+          const newLitres = Math.max(0, inv.litres - litresToDeduct);
+          if (newQty <= 0) {
+            await tx.inventory.delete({ where: { id: inv.id } });
+          } else {
+            await tx.inventory.update({
+              where: { id: inv.id },
+              data: { quantity: newQty, litres: newLitres },
+            });
+          }
         }
       }
 

@@ -71,9 +71,6 @@ export async function POST(request: Request) {
           gstPercNum != null && !Number.isNaN(gstPercNum) ? gstPercNum : null,
       },
     });
-    await prisma.inventory.create({
-      data: { productId: product.id, quantity: 0 },
-    });
     return NextResponse.json(product);
   } catch (e) {
     console.error(e);

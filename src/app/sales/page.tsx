@@ -32,6 +32,14 @@ type LineState = {
   unitPrice: number;
 };
 
+type InventoryOption = {
+  productId: string;
+  productName: string;
+  batchNumber: string;
+  quantity: number;
+  stockTypes: string[];
+};
+
 const emptyLine: LineState = {
   productId: "",
   productSearch: "",
@@ -45,6 +53,10 @@ export default function SalesPage() {
   const [sales, setSales] = useState<Sale[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [inventoryOptions, setInventoryOptions] = useState<{
+    products: { id: string; name: string }[];
+    inventoryOptions: InventoryOption[];
+  }>({ products: [], inventoryOptions: [] });
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingSaleId, setEditingSaleId] = useState<string | null>(null);
@@ -86,8 +98,9 @@ export default function SalesPage() {
       fetch("/api/sales").then((r) => r.json().then((json) => ({ ok: r.ok, json }))),
       fetch("/api/customers").then((r) => r.json().then((json) => ({ ok: r.ok, json }))),
       fetch("/api/products").then((r) => r.json().then((json) => ({ ok: r.ok, json }))),
+      fetch("/api/inventory?options=true").then((r) => r.json().then((json) => ({ ok: r.ok, json }))),
     ])
-      .then(([s, c, prod]) => {
+      .then(([s, c, prod, invOpt]) => {
         const err: string[] = [];
         if (s.ok && Array.isArray(s.json)) setSales(s.json);
         else err.push((s.json as { error?: string })?.error || "sales");
@@ -95,6 +108,18 @@ export default function SalesPage() {
         else err.push((c.json as { error?: string })?.error || "customers");
         if (prod.ok && Array.isArray(prod.json)) setProducts(prod.json);
         else err.push((prod.json as { error?: string })?.error || "products");
+        if (invOpt.ok && invOpt.json?.products && Array.isArray(invOpt.json?.inventoryOptions)) {
+          setInventoryOptions({
+            products: invOpt.json.products,
+            inventoryOptions: invOpt.json.inventoryOptions,
+          });
+          const batchMap: Record<string, string[]> = {};
+          for (const o of invOpt.json.inventoryOptions as InventoryOption[]) {
+            if (!batchMap[o.productId]) batchMap[o.productId] = [];
+            if (!batchMap[o.productId].includes(o.batchNumber)) batchMap[o.productId].push(o.batchNumber);
+          }
+          setBatchesByProduct(batchMap);
+        }
         setLoadError(err.length ? (err.length === 1 ? err[0] : "Failed to load data. Check your connection and retry.") : null);
       })
       .catch(() => setLoadError("Failed to load data. Check your connection and retry."))
@@ -114,16 +139,17 @@ export default function SalesPage() {
       const next = [...prev];
       next[i] = { ...next[i], [field]: value };
       if (field === "productId") {
-        const product = products.find((p) => p.id === (value as string));
+        const product = inventoryOptions.products.find((p) => p.id === (value as string));
         next[i].productSearch = product?.name ?? "";
         next[i].batchNumber = "";
-        const pid = value as string;
-        if (pid && !batchesByProduct[pid]) {
-          fetchBatches(pid).then((batches) =>
-            setBatchesByProduct((b) => ({ ...b, [pid]: batches }))
-          );
-        }
+        next[i].stockType = "";
         setOpenProductLine(null);
+      }
+      if (field === "batchNumber") {
+        const opt = inventoryOptions.inventoryOptions.find(
+          (o) => o.productId === next[i].productId && o.batchNumber === value
+        );
+        if (opt?.stockTypes?.length && !next[i].stockType) next[i].stockType = opt.stockTypes[0];
       }
       return next;
     });
@@ -132,8 +158,27 @@ export default function SalesPage() {
     setLines((prev) => prev.filter((_, j) => j !== i));
   };
 
+  const formProducts = (() => {
+    const list = [...(inventoryOptions.products ?? [])];
+    if (editingSaleId && lines.some((l) => l.productId)) {
+      const ids = new Set(list.map((p) => p.id));
+      for (const line of lines) {
+        if (line.productId && !ids.has(line.productId)) {
+          list.push({ id: line.productId, name: line.productSearch || "Unknown" });
+          ids.add(line.productId);
+        }
+      }
+      list.sort((a, b) => a.name.localeCompare(b.name));
+    }
+    return list;
+  })();
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!reference.trim()) {
+      alert("Invoice number is required.");
+      return;
+    }
     if (customerId === "__new__" && !newCustomerName.trim()) {
       alert("Enter the new customer name");
       return;
@@ -148,6 +193,18 @@ export default function SalesPage() {
       alert("Batch is required for every line item.");
       return;
     }
+    const missingStockType = items.some((l) => !l.stockType?.trim());
+    if (missingStockType) {
+      alert("Stock type is required for every line item.");
+      return;
+    }
+    const invalidUnitPrice = items.some(
+      (l) => typeof l.unitPrice !== "number" || Number.isNaN(l.unitPrice) || l.unitPrice < 0
+    );
+    if (invalidUnitPrice) {
+      alert("Sale price per litre is required for every line item (enter 0 or more).");
+      return;
+    }
     const body = {
       customerId: customerId === "__new__" ? undefined : customerId,
       ...(customerId === "__new__" &&
@@ -157,7 +214,7 @@ export default function SalesPage() {
             gstNumber: newCustomerGstNumber.trim() || undefined,
           },
         }),
-      reference: reference.trim() || null,
+      reference: reference.trim(),
       notes: notes.trim() || null,
       date,
       gstPerc: Number(gstPerc) || 0,
@@ -165,7 +222,7 @@ export default function SalesPage() {
         productId: l.productId,
         batchNumber: l.batchNumber.trim(),
         quantity: l.quantity,
-        stockType: l.stockType.trim() || undefined,
+        stockType: l.stockType.trim(),
         unitPrice: Number(l.unitPrice) || 0,
       })),
     };
@@ -219,7 +276,13 @@ export default function SalesPage() {
     const batches: Record<string, string[]> = {};
     for (const pid of productIds) {
       const b = await fetchBatches(pid);
-      batches[pid] = b;
+      batches[pid] = [...b];
+    }
+    for (const it of sale.items) {
+      if (it.batchNumber?.trim()) {
+        if (!batches[it.productId]) batches[it.productId] = [];
+        if (!batches[it.productId].includes(it.batchNumber)) batches[it.productId].push(it.batchNumber);
+      }
     }
     setBatchesByProduct((prev) => ({ ...prev, ...batches }));
     setShowForm(true);
@@ -342,7 +405,7 @@ export default function SalesPage() {
               />
             </div>
             <div>
-              <label className="block text-sm text-slate-600">Invoice number</label>
+              <label className="block text-sm text-slate-600">Invoice number *</label>
               <input
                 value={reference}
                 onChange={(e) => setReference(e.target.value)}
@@ -402,7 +465,7 @@ export default function SalesPage() {
                       >
                         <span className={line.productId ? "" : "text-slate-500"}>
                           {line.productId
-                            ? (products.find((p) => p.id === line.productId)?.name ?? (line.productSearch || "Select product"))
+                            ? (formProducts.find((p) => p.id === line.productId)?.name ?? (line.productSearch || "Select product"))
                             : "Select product"}
                         </span>
                         <span className="text-slate-400 text-xs" aria-hidden>▼</span>
@@ -424,7 +487,7 @@ export default function SalesPage() {
                             autoFocus
                           />
                           <ul className="max-h-48 overflow-y-auto py-1">
-                            {(Array.isArray(products) ? products : [])
+                            {formProducts
                               .filter((p) =>
                                 !line.productSearch.trim()
                                   ? true
@@ -441,12 +504,14 @@ export default function SalesPage() {
                                   </button>
                                 </li>
                               ))}
-                            {((Array.isArray(products) ? products : []).filter((p) =>
+                            {formProducts.filter((p) =>
                               !line.productSearch.trim()
                                 ? true
                                 : p.name.toLowerCase().includes(line.productSearch.trim().toLowerCase())
-                            ).length === 0) && (
-                              <li className="px-2 py-2 text-sm text-slate-500">No products match</li>
+                            ).length === 0 && (
+                              <li className="px-2 py-2 text-sm text-slate-500">
+                                {formProducts.length ? "No products match" : "No products in stock. Add inventory via Purchases."}
+                              </li>
                             )}
                           </ul>
                         </div>
@@ -495,7 +560,7 @@ export default function SalesPage() {
                     </div>
                     <div>
                       <label className="block text-xs text-slate-600">
-                        Stock type
+                        Stock type *
                       </label>
                       <select
                         value={line.stockType}
@@ -505,13 +570,29 @@ export default function SalesPage() {
                         className="mt-0.5 w-full rounded border border-slate-300 px-2 py-1.5 text-sm"
                       >
                         <option value="">Select</option>
-                        <option value="Drum">Drum</option>
-                        <option value="Pail">Pail</option>
+                        {(() => {
+                          const opt = line.productId && line.batchNumber
+                            ? inventoryOptions.inventoryOptions.find(
+                                (o) =>
+                                  o.productId === line.productId &&
+                                  (o.batchNumber ?? "").trim() === (line.batchNumber ?? "").trim()
+                              )
+                            : null;
+                          const types =
+                            opt && opt.stockTypes?.length
+                              ? opt.stockTypes
+                              : ["Drum", "Pail"];
+                          return types.map((st) => (
+                            <option key={st} value={st}>
+                              {st}
+                            </option>
+                          ));
+                        })()}
                       </select>
                     </div>
                     <div>
                       <label className="block text-xs text-slate-600">
-                        Sale price per litre
+                        Sale price per litre *
                       </label>
                       <input
                         type="number"
