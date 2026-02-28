@@ -14,12 +14,45 @@ type Dashboard = {
   lowStock: { quantity: number; product: { name: string; id: string } }[];
 };
 
+const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+function buildYearMonthOptions() {
+  const options: { value: string; label: string; year: number | null; month: number | null }[] = [
+    { value: "", label: "All time", year: null, month: null },
+  ];
+  const now = new Date();
+  for (let i = 0; i < 36; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const y = d.getFullYear();
+    const m = d.getMonth() + 1;
+    options.push({
+      value: `${y}-${m}`,
+      label: `${y}-${MONTH_NAMES[d.getMonth()]}`,
+      year: y,
+      month: m,
+    });
+  }
+  return options;
+}
+
+const yearMonthOptions = buildYearMonthOptions();
+
 export default function DashboardPage() {
   const [data, setData] = useState<Dashboard | null>(null);
   const [loading, setLoading] = useState(true);
+  const [filterValue, setFilterValue] = useState("");
 
   useEffect(() => {
-    fetch("/api/dashboard")
+    const params = new URLSearchParams();
+    if (filterValue) {
+      const opt = yearMonthOptions.find((o) => o.value === filterValue);
+      if (opt?.year != null && opt?.month != null) {
+        params.set("year", String(opt.year));
+        params.set("month", String(opt.month));
+      }
+    }
+    const url = params.toString() ? `/api/dashboard?${params.toString()}` : "/api/dashboard";
+    fetch(url)
       .then((r) => r.json().then((json) => ({ ok: r.ok, json })))
       .then(({ ok, json }) => {
         if (!ok || !json || json.error) {
@@ -39,7 +72,7 @@ export default function DashboardPage() {
       })
       .catch(() => setData(null))
       .finally(() => setLoading(false));
-  }, []);
+  }, [filterValue]);
 
   if (loading) {
     return (
@@ -86,9 +119,28 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8">
-      <h1 className="text-3xl font-bold tracking-tight text-slate-800">
-        Dashboard
-      </h1>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <h1 className="text-3xl font-bold tracking-tight text-slate-800">
+          Business Hub
+        </h1>
+        <div className="flex items-center gap-2">
+          <label htmlFor="dashboard-date-filter" className="text-sm font-medium text-slate-600">
+            Date (purchase &amp; sale):
+          </label>
+          <select
+            id="dashboard-date-filter"
+            value={filterValue}
+            onChange={(e) => setFilterValue(e.target.value)}
+            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+          >
+            {yearMonthOptions.map((opt) => (
+              <option key={opt.value || "all"} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         {Array.isArray(cards) && cards.map((c, i) => (

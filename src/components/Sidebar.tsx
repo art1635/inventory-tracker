@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const nav = [
-  { href: "/", label: "Dashboard" },
+  { href: "/", label: "Business Hub" },
   { href: "/products", label: "Product Master" },
   { href: "/suppliers", label: "Suppliers" },
   { href: "/customers", label: "Customers" },
@@ -20,9 +20,10 @@ export function Sidebar() {
       <div className="sticky top-0 flex h-screen flex-col py-6">
         <Link
           href="/"
-          className="mx-4 rounded-lg bg-teal-700/50 px-4 py-3 text-base font-bold tracking-tight text-white transition-colors hover:bg-teal-700"
+          className="mx-4 rounded-lg bg-teal-700/50 px-4 py-3 text-center text-white transition-colors hover:bg-teal-700"
         >
-          Inventory Tracker
+          <span className="block text-sm font-bold uppercase tracking-wider">Star Industries</span>
+          <span className="block mt-0.5 text-xs font-medium text-teal-200">Business Hub</span>
         </Link>
         <nav className="mt-6 flex flex-1 flex-col gap-1 px-3">
           {nav.map((item) => {

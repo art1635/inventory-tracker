@@ -12,15 +12,35 @@ const zero = {
   lowStock: [] as { quantity: number; product: { name: string; id: string } }[],
 };
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const { searchParams } = new URL(request.url);
+    const yearParam = searchParams.get("year");
+    const monthParam = searchParams.get("month");
+    const hasDateFilter =
+      yearParam != null &&
+      monthParam != null &&
+      /^\d{4}$/.test(yearParam) &&
+      /^\d{1,2}$/.test(monthParam);
+    const year = hasDateFilter ? parseInt(yearParam!, 10) : null;
+    const month = hasDateFilter ? parseInt(monthParam!, 10) : null;
+
+    let purchaseWhere = {};
+    let saleWhere = {};
+    if (year != null && month != null && month >= 1 && month <= 12) {
+      const start = new Date(year, month - 1, 1, 0, 0, 0, 0);
+      const end = new Date(year, month, 1, 0, 0, 0, 0);
+      purchaseWhere = { date: { gte: start, lt: end } };
+      saleWhere = { date: { gte: start, lt: end } };
+    }
+
     const [products, suppliers, customers, purchases, sales, inventory] =
       await Promise.all([
         prisma.product.count().catch(() => 0),
         prisma.supplier.count().catch(() => 0),
         prisma.customer.count().catch(() => 0),
-        prisma.purchase.count().catch(() => 0),
-        prisma.sale.count().catch(() => 0),
+        prisma.purchase.count({ where: purchaseWhere }).catch(() => 0),
+        prisma.sale.count({ where: saleWhere }).catch(() => 0),
         prisma.inventory
           .findMany({
             include: { product: true },
@@ -31,8 +51,8 @@ export async function GET() {
       ]);
 
     const [purchaseSum, saleSum] = await Promise.all([
-      prisma.purchase.aggregate({ _sum: { total: true } }).catch(() => ({ _sum: { total: null } })),
-      prisma.sale.aggregate({ _sum: { total: true } }).catch(() => ({ _sum: { total: null } })),
+      prisma.purchase.aggregate({ where: purchaseWhere, _sum: { total: true } }).catch(() => ({ _sum: { total: null } })),
+      prisma.sale.aggregate({ where: saleWhere, _sum: { total: true } }).catch(() => ({ _sum: { total: null } })),
     ]);
 
     return NextResponse.json({

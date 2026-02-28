@@ -3,8 +3,8 @@ import "./globals.css";
 import { Sidebar } from "@/components/Sidebar";
 
 export const metadata: Metadata = {
-  title: "Inventory Tracker | SMB",
-  description: "Track purchases, sales, and inventory",
+  title: "Star Industries | Business Hub",
+  description: "Star Industries business hub – track purchases, sales, and inventory",
 };
 
 export default function RootLayout({
