@@ -18,7 +18,32 @@ export async function GET(
     if (!sale) {
       return NextResponse.json({ error: "Sale not found" }, { status: 404 });
     }
-    return NextResponse.json(sale);
+    const purchaseItems = await prisma.purchaseItem.findMany({
+      where: { batchNumber: { not: null } },
+      select: { productId: true, batchNumber: true, manufacturingDate: true },
+      orderBy: { purchaseId: "desc" },
+    });
+    const domByProductBatch = new Map<string, string | null>();
+    const keyFor = (productId: string, batchNumber: string | null) =>
+      `${productId}|${(batchNumber ?? "").trim()}`;
+    for (const pi of purchaseItems) {
+      const key = keyFor(pi.productId, pi.batchNumber);
+      if (!domByProductBatch.has(key)) {
+        domByProductBatch.set(
+          key,
+          pi.manufacturingDate ? pi.manufacturingDate.toISOString().slice(0, 10) : null
+        );
+      }
+    }
+    const enriched = {
+      ...sale,
+      items: sale.items.map((item) => ({
+        ...item,
+        manufacturingDate:
+          domByProductBatch.get(keyFor(item.productId, item.batchNumber)) ?? null,
+      })),
+    };
+    return NextResponse.json(enriched);
   } catch (e) {
     console.error(e);
     return NextResponse.json(

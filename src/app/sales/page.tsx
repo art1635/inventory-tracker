@@ -19,6 +19,7 @@ type Sale = {
     total: number;
     batchNumber: string | null;
     stockType: string | null;
+    manufacturingDate?: string | null;
     product: { name: string; litres?: number | null };
   }[];
 };
@@ -797,7 +798,11 @@ export default function SalesPage() {
                         <tr key={idx}>
                           <td className="px-3 py-2 text-slate-900">{item.product?.name ?? "—"}</td>
                           <td className="px-3 py-2 text-slate-600">{item.batchNumber ?? "—"}</td>
-                          <td className="px-3 py-2 text-slate-600">—</td>
+                          <td className="px-3 py-2 text-slate-600">
+                            {item.manufacturingDate
+                              ? new Date(item.manufacturingDate).toLocaleDateString()
+                              : "—"}
+                          </td>
                           <td className="px-3 py-2 text-right text-slate-900">{item.quantity}</td>
                           <td className="px-3 py-2 text-right text-slate-900">
                             {salePricePerLitre != null ? `₹${salePricePerLitre.toLocaleString("en-IN", { minimumFractionDigits: 2 })}` : "—"}
