@@ -9,9 +9,10 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await getServerSession(authOptions);
-  if (!(await canAccessAdmin(session))) {
+  if (!(await canAccessAdmin(session)) || !session?.user?.id) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
+  const currentUserId = session.user.id;
   try {
     const { id } = await params;
     if (!id) {
@@ -21,7 +22,7 @@ export async function DELETE(
     if (!target) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
-    const isSelf = session.user.id === id;
+    const isSelf = currentUserId === id;
     if (isSelf) {
       const countResult = await prisma.$queryRaw<[{ count: bigint }]>`
         SELECT COUNT(*)::int as count FROM "User" WHERE "isAdmin" = true
@@ -51,9 +52,10 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await getServerSession(authOptions);
-  if (!(await canAccessAdmin(session))) {
+  if (!(await canAccessAdmin(session)) || !session?.user?.id) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
+  const currentUserId = session.user.id;
   try {
     const { id } = await params;
     if (!id) {
@@ -65,7 +67,7 @@ export async function PATCH(
     if (!target) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
-    const isSelf = session.user.id === id;
+    const isSelf = currentUserId === id;
     if (isSelf && !isAdmin) {
       const countResult = await prisma.$queryRaw<[{ count: bigint }]>`
         SELECT COUNT(*)::int as count FROM "User" WHERE "isAdmin" = true
