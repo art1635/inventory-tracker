@@ -1,0 +1,5 @@
+# NEXTAUTH_SECRET is only needed at runtime, not during build.
+# Without this, Railway's build may try to mount it as a build secret and fail.
+[phases.build]
+cmds = ["npm run build"]
+secrets = []
