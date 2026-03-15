@@ -48,7 +48,7 @@ export default function ResetPasswordPage() {
         <p className="mt-1 text-sm text-slate-500">
           Clear an existing user’s password, or create a new user so you can set a password on first login.
         </p>
-        <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+        <form onSubmit={(e) => e.preventDefault()} className="mt-6 space-y-4">
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-slate-700">
               Email
