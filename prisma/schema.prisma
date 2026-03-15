@@ -119,3 +119,15 @@ model Inventory {
   product Product @relation(fields: [productId], references: [id])
   @@unique([productId, batchNumber])
 }
+
+// Login-only users (no sign-up). Add by email; first login sets password.
+// Only admins can add/revoke users (Users page).
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String?   // null until first login
+  name         String?
+  isAdmin      Boolean   @default(false)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
