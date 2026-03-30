@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { findInventoryByProductAndBatch } from "@/lib/inventory";
 
+const round2 = (value: number) => Math.round(value * 100) / 100;
+
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -106,7 +108,7 @@ export async function PATCH(
     }
 
     const body = await request.json();
-    const { supplierId, newSupplier, reference, notes, date, gstNumber, items } = body;
+    const { supplierId, newSupplier, reference, notes, date, gstNumber, gstPerc, items } = body;
     if (!Array.isArray(items) || items.length === 0) {
       return NextResponse.json(
         { error: "At least one item is required" },
@@ -190,6 +192,9 @@ export async function PATCH(
       }
     );
 
+    const parsedGst = Number(gstPerc);
+    const gst = Number.isFinite(parsedGst) && parsedGst >= 0 ? parsedGst : 18;
+
     const updated = await prisma.$transaction(async (tx) => {
       for (const item of purchase.items) {
         const batchNum = (item.batchNumber || "").trim();
@@ -236,13 +241,16 @@ export async function PATCH(
         let unitPriceForDb: number;
         if (ratePerLitre > 0) {
           const litres = litresPerUnit > 0 ? raw.quantity * litresPerUnit : raw.quantity;
-          lineTotal = litres * ratePerLitre;
-          unitPriceForDb = raw.quantity > 0 ? lineTotal / raw.quantity : 0;
+          const baseTotal = litres * ratePerLitre;
+          lineTotal = round2(baseTotal * (1 + gst / 100));
+          unitPriceForDb = raw.quantity > 0 ? round2(lineTotal / raw.quantity) : 0;
         } else {
           unitPriceForDb = raw.unitPrice;
-          lineTotal = raw.quantity * unitPriceForDb;
+          const baseTotal = raw.quantity * unitPriceForDb;
+          lineTotal = round2(baseTotal * (1 + gst / 100));
+          unitPriceForDb = round2(unitPriceForDb);
         }
-        total += lineTotal;
+        total = round2(total + lineTotal);
         await tx.purchaseItem.create({
           data: {
             purchaseId: id,
@@ -281,7 +289,7 @@ export async function PATCH(
       }
       await tx.purchase.update({
         where: { id },
-        data: { total },
+        data: { total: round2(total) },
       });
 
       return tx.purchase.findUnique({

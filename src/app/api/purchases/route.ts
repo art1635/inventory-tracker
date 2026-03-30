@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { findInventoryByProductAndBatch } from "@/lib/inventory";
 
+const round2 = (value: number) => Math.round(value * 100) / 100;
+
 export async function GET() {
   try {
     const purchases = await prisma.purchase.findMany({
@@ -26,7 +28,7 @@ const NEW_SUPPLIER = "__new__";
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { supplierId, newSupplier, reference, notes, date, gstNumber, items } = body;
+    const { supplierId, newSupplier, reference, notes, date, gstNumber, gstPerc, items } = body;
     if (!Array.isArray(items) || items.length === 0) {
       return NextResponse.json(
         { error: "At least one item is required" },
@@ -111,6 +113,9 @@ export async function POST(request: Request) {
       }
     );
 
+    const parsedGst = Number(gstPerc);
+    const gst = Number.isFinite(parsedGst) && parsedGst >= 0 ? parsedGst : 18;
+
     const purchase = await prisma.$transaction(async (tx) => {
       let total = 0;
       const p = await tx.purchase.create({
@@ -135,13 +140,16 @@ export async function POST(request: Request) {
         let unitPriceForDb: number;
         if (ratePerLitre > 0) {
           const litres = litresPerUnit > 0 ? raw.quantity * litresPerUnit : raw.quantity;
-          lineTotal = litres * ratePerLitre;
-          unitPriceForDb = raw.quantity > 0 ? lineTotal / raw.quantity : 0;
+          const baseTotal = litres * ratePerLitre;
+          lineTotal = round2(baseTotal * (1 + gst / 100));
+          unitPriceForDb = raw.quantity > 0 ? round2(lineTotal / raw.quantity) : 0;
         } else {
           unitPriceForDb = raw.unitPrice;
-          lineTotal = raw.quantity * unitPriceForDb;
+          const baseTotal = raw.quantity * unitPriceForDb;
+          lineTotal = round2(baseTotal * (1 + gst / 100));
+          unitPriceForDb = round2(unitPriceForDb);
         }
-        total += lineTotal;
+        total = round2(total + lineTotal);
         await tx.purchaseItem.create({
           data: {
             purchaseId: p.id,
@@ -180,7 +188,7 @@ export async function POST(request: Request) {
       }
       await tx.purchase.update({
         where: { id: p.id },
-        data: { total },
+        data: { total: round2(total) },
       });
       return tx.purchase.findUnique({
         where: { id: p.id },
